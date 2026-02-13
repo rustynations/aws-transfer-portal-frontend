@@ -15,6 +15,8 @@ async function apiRequest<T>(
 ): Promise<T> {
   const idToken = await getIdToken();
   
+  console.log('API Request:', endpoint);
+  
   const response = await fetch(`${config.apiEndpoint}${endpoint}`, {
     ...options,
     headers: {
@@ -24,6 +26,8 @@ async function apiRequest<T>(
     },
   });
 
+  console.log('API Response status:', response.status, endpoint);
+
   if (!response.ok) {
     const error: ApiError = {
       message: `API request failed: ${response.statusText}`,
@@ -32,6 +36,7 @@ async function apiRequest<T>(
     
     try {
       const errorData = await response.json();
+      console.error('API Error response:', errorData);
       error.message = errorData.message || error.message;
     } catch {
       // Use default error message
@@ -40,7 +45,9 @@ async function apiRequest<T>(
     throw error;
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('API Response data:', endpoint, data);
+  return data;
 }
 
 // User Management API
@@ -56,8 +63,14 @@ export interface UserData {
   storage_bytes?: number;
 }
 
+export interface UsersResponse {
+  users: UserData[];
+  count: number;
+}
+
 export async function listUsers(): Promise<UserData[]> {
-  return apiRequest<UserData[]>('/users');
+  const response = await apiRequest<UsersResponse>('/users');
+  return response.users;
 }
 
 export async function getUser(username: string): Promise<UserData> {
@@ -115,8 +128,15 @@ export interface FileMetadata {
   lastModified: string;
 }
 
+export interface FilesResponse {
+  files: FileMetadata[];
+  count: number;
+  totalSize: number;
+}
+
 export async function listFiles(): Promise<FileMetadata[]> {
-  return apiRequest<FileMetadata[]>('/files');
+  const response = await apiRequest<FilesResponse>('/files');
+  return response.files;
 }
 
 export async function getUploadUrl(filename: string): Promise<{ uploadUrl: string }> {

@@ -28,20 +28,23 @@ export default function AppShell({ user, onLogout, children }: AppShellProps) {
       text: 'SSH Keys',
       href: '/keys',
     },
-    ...(isAdmin ? [
-      { type: 'divider' as const },
+  ];
+
+  if (isAdmin) {
+    navigationItems.push(
+      { type: 'divider' },
       {
-        type: 'link' as const,
+        type: 'link',
         text: 'Dashboard',
         href: '/dashboard',
       },
       {
-        type: 'link' as const,
+        type: 'link',
         text: 'User Management',
         href: '/users',
-      },
-    ] : []),
-  ];
+      }
+    );
+  }
 
   const handleNavigate: SideNavigationProps['onFollow'] = (event) => {
     event.preventDefault();

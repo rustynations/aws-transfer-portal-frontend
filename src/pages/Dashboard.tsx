@@ -26,15 +26,30 @@ export default function DashboardPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const [statsData, activityData] = await Promise.all([
-        getSystemStats(),
-        getActivityLog(),
-      ]);
-      setStats(statsData);
-      setActivity(activityData);
       setError('');
+      
+      const [statsData, activityData] = await Promise.all([
+        getSystemStats().catch(err => {
+          console.error('Stats error:', err);
+          return null;
+        }),
+        getActivityLog().catch(err => {
+          console.error('Activity error:', err);
+          return [];
+        }),
+      ]);
+      
+      console.log('Stats data:', statsData);
+      console.log('Activity data:', activityData, 'Is array?', Array.isArray(activityData));
+      
+      setStats(statsData);
+      // Ensure activity is always an array
+      setActivity(Array.isArray(activityData) ? activityData : []);
     } catch (err: any) {
+      console.error('Dashboard error:', err);
       setError(err.message || 'Failed to load dashboard data');
+      setStats(null);
+      setActivity([]);
     } finally {
       setLoading(false);
     }
@@ -97,7 +112,7 @@ export default function DashboardPage() {
         </Container>
 
         <Container header={<Header variant="h2">Users by Access Type</Header>}>
-          {stats ? (
+          {stats && stats.usersByAccessType ? (
             <ColumnLayout columns={4} variant="text-grid">
               <div>
                 <Box variant="awsui-key-label">Admin</Box>
