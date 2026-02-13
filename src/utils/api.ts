@@ -100,12 +100,19 @@ export async function deleteUser(username: string): Promise<void> {
 // SSH Key Management API
 export interface SSHKey {
   key_id: string;
-  public_key: string;
+  public_key?: string;  // Only returned when adding a key
+  fingerprint?: string; // Returned when listing keys
   added_date: string;
 }
 
+export interface KeysResponse {
+  keys: SSHKey[];
+  count: number;
+}
+
 export async function listKeys(): Promise<SSHKey[]> {
-  return apiRequest<SSHKey[]>('/keys');
+  const response = await apiRequest<KeysResponse>('/keys');
+  return response.keys;
 }
 
 export async function addKey(publicKey: string): Promise<SSHKey> {

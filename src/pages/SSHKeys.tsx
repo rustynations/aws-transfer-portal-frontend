@@ -132,7 +132,7 @@ export default function SSHKeysPage() {
               header: 'Public Key',
               cell: (item) => (
                 <Box variant="code" fontSize="body-s">
-                  {truncateKey(item.public_key)}
+                  {truncateKey(item.fingerprint || item.public_key || '')}
                 </Box>
               ),
             },
