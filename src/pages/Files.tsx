@@ -9,6 +9,7 @@ import Alert from '@cloudscape-design/components/alert';
 import Modal from '@cloudscape-design/components/modal';
 import FormField from '@cloudscape-design/components/form-field';
 import FileUpload from '@cloudscape-design/components/file-upload';
+import ProgressBar from '@cloudscape-design/components/progress-bar';
 import { listFiles, getUploadUrl, getDownloadUrl, deleteFile, type FileMetadata } from '../utils/api';
 
 export default function FilesPage() {
@@ -22,6 +23,8 @@ export default function FilesPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentFileName, setCurrentFileName] = useState('');
 
   useEffect(() => {
     loadFiles();
@@ -47,33 +50,64 @@ export default function FilesPage() {
     setError('');
 
     try {
-      for (const file of uploadFiles) {
+      for (let i = 0; i < uploadFiles.length; i++) {
+        const file = uploadFiles[i];
+        setCurrentFileName(file.name);
+        setUploadProgress(0);
+        
         // Get pre-signed upload URL
         const { uploadUrl } = await getUploadUrl(file.name);
         
-        // Upload file to S3
-        const response = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: {
-            'Content-Type': file.type || 'application/octet-stream',
-          },
+        // Upload file to S3 with progress tracking
+        await uploadWithProgress(uploadUrl, file, (progress) => {
+          setUploadProgress(progress);
         });
-
-        if (!response.ok) {
-          throw new Error(`Failed to upload ${file.name}`);
-        }
       }
 
       setSuccess(`Successfully uploaded ${uploadFiles.length} file(s)`);
       setShowUploadModal(false);
       setUploadFiles([]);
+      setUploadProgress(0);
+      setCurrentFileName('');
       await loadFiles();
     } catch (err: any) {
       setError(err.message || 'Upload failed');
     } finally {
       setUploading(false);
     }
+  }
+
+  function uploadWithProgress(
+    url: string,
+    file: File,
+    onProgress: (progress: number) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = Math.round((e.loaded / e.total) * 100);
+          onProgress(percentComplete);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('Upload failed'));
+      });
+
+      xhr.open('PUT', url);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.send(file);
+    });
   }
 
   async function handleDownload(file: FileMetadata) {
@@ -224,23 +258,37 @@ export default function FilesPage() {
           </Box>
         }
       >
-        <FormField label="Select files">
-          <FileUpload
-            value={uploadFiles}
-            onChange={({ detail }) => setUploadFiles(detail.value)}
-            multiple
-            showFileSize
-            showFileLastModified
-            i18nStrings={{
-              uploadButtonText: (e) => (e ? 'Choose files' : 'Choose file'),
-              dropzoneText: (e) => (e ? 'Drop files to upload' : 'Drop file to upload'),
-              removeFileAriaLabel: (e) => `Remove file ${e + 1}`,
-              limitShowFewer: 'Show fewer files',
-              limitShowMore: 'Show more files',
-              errorIconAriaLabel: 'Error',
-            }}
-          />
-        </FormField>
+        <SpaceBetween size="m">
+          {uploading && (
+            <SpaceBetween size="xs">
+              <Box>Uploading {currentFileName}...</Box>
+              <ProgressBar
+                value={uploadProgress}
+                label="Upload progress"
+                description={`${uploadProgress}% complete`}
+                status={uploadProgress === 100 ? 'success' : 'in-progress'}
+              />
+            </SpaceBetween>
+          )}
+          
+          <FormField label="Select files">
+            <FileUpload
+              value={uploadFiles}
+              onChange={({ detail }) => setUploadFiles(detail.value)}
+              multiple
+              showFileSize
+              showFileLastModified
+              i18nStrings={{
+                uploadButtonText: (e) => (e ? 'Choose files' : 'Choose file'),
+                dropzoneText: (e) => (e ? 'Drop files to upload' : 'Drop file to upload'),
+                removeFileAriaLabel: (e) => `Remove file ${e + 1}`,
+                limitShowFewer: 'Show fewer files',
+                limitShowMore: 'Show more files',
+                errorIconAriaLabel: 'Error',
+              }}
+            />
+          </FormField>
+        </SpaceBetween>
       </Modal>
     </ContentLayout>
   );
