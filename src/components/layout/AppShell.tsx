@@ -4,18 +4,22 @@ import AppLayout from '@cloudscape-design/components/app-layout';
 import SideNavigation, { type SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import TopNavigation from '@cloudscape-design/components/top-navigation';
 import { logout, type User } from '../../utils/auth';
+import Notifications, { type Notification } from '../Notifications';
 
 interface AppShellProps {
   user: User;
   onLogout: () => void;
+  notifications: Notification[];
+  onDismissNotification: (id: string) => void;
   children: ReactNode;
 }
 
-export default function AppShell({ user, onLogout, children }: AppShellProps) {
+export default function AppShell({ user, onLogout, notifications, onDismissNotification, children }: AppShellProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const isAdmin = user.accessType === 'ADMIN';
+  const hasSSHAccess = user.accessType === 'SFTP_ONLY' || user.accessType === 'HYBRID';
 
   const navigationItems: SideNavigationProps.Item[] = [
     {
@@ -23,12 +27,16 @@ export default function AppShell({ user, onLogout, children }: AppShellProps) {
       text: 'Files',
       href: '/files',
     },
-    {
+  ];
+
+  // Only show SSH Keys for users with SFTP access
+  if (hasSSHAccess) {
+    navigationItems.push({
       type: 'link',
       text: 'SSH Keys',
       href: '/keys',
-    },
-  ];
+    });
+  }
 
   if (isAdmin) {
     navigationItems.push(
@@ -69,13 +77,11 @@ export default function AppShell({ user, onLogout, children }: AppShellProps) {
           {
             type: 'menu-dropdown',
             text: user.email,
-            description: user.accessType,
             iconName: 'user-profile',
             items: [
               {
                 id: 'profile',
                 text: 'Profile',
-                disabled: true,
               },
               {
                 id: 'logout',
@@ -85,6 +91,8 @@ export default function AppShell({ user, onLogout, children }: AppShellProps) {
             onItemClick: ({ detail }) => {
               if (detail.id === 'logout') {
                 handleLogout();
+              } else if (detail.id === 'profile') {
+                navigate('/profile');
               }
             },
           },
@@ -99,7 +107,15 @@ export default function AppShell({ user, onLogout, children }: AppShellProps) {
             items={navigationItems}
           />
         }
-        content={children}
+        content={
+          <>
+            <Notifications 
+              notifications={notifications}
+              onDismiss={onDismissNotification}
+            />
+            {children}
+          </>
+        }
         toolsHide
         navigationWidth={200}
       />

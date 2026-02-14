@@ -5,11 +5,13 @@ React-based web portal for managing file transfers via AWS Transfer Family. Buil
 ## Features
 
 - **Secure Authentication**: Cognito-based login with email/password
-- **File Management**: Upload, download, and delete files with pre-signed URLs
+- **File Management**: Upload with progress bar, download, and delete files with pre-signed URLs
 - **SSH Key Management**: Add and manage SSH public keys for SFTP access
-- **Admin Dashboard**: System statistics and activity monitoring (admin only)
-- **User Management**: Create and manage user accounts (admin only)
-- **Responsive Design**: Works on desktop and mobile devices
+- **Admin Dashboard**: System statistics, activity monitoring with filtering and pagination (admin only)
+- **User Management**: Create and manage user accounts with root user protection (admin only)
+- **Responsive Design**: Works on desktop and mobile devices using Cloudscape Design System
+- **Real-Time Updates**: Dashboard shows current file counts and storage usage
+- **Activity Logging**: All operations logged with username, action, and timestamp
 
 ## Prerequisites
 
@@ -76,18 +78,28 @@ src/
 
 ### Regular Users (WEB_ONLY, HYBRID)
 - View and manage their own files
-- Upload and download files via web portal
+- Upload files with progress indicator
+- Download files via web portal
 - Manage their SSH keys
+- View Transfer Family endpoint for SFTP access
 
 ### Admin Users (ADMIN)
 - All regular user capabilities
-- View system dashboard with statistics
-- Create and manage user accounts
-- View activity logs across all users
+- View system dashboard with real-time statistics
+- Create and manage user accounts (except root users)
+- View and filter activity logs across all users
+- Monitor storage usage and file counts
+
+### Root Users (ADMIN with is_root flag)
+- Created during bootstrap deployment
+- Cannot be modified or deleted via web portal
+- Must be managed via CDK redeployment
+- Prevents accidental lockout
 
 ### SFTP-Only Users (SFTP_ONLY)
 - Cannot access web portal
 - SFTP access only via SSH keys
+- Must have at least one SSH key configured
 
 ## Technology Stack
 
@@ -134,20 +146,41 @@ The web portal can be deployed to:
 ### Login fails with "User does not exist"
 - Ensure the user exists in Cognito User Pool
 - Check that the user was created via the API (not manually in console)
+- Verify the user has WEB_ONLY, HYBRID, or ADMIN access type (not SFTP_ONLY)
 
 ### API requests return 401 Unauthorized
 - Verify environment variables are correct
 - Check that ID token is being sent (not access token)
 - Ensure Cognito authorizer is configured in API Gateway
+- Try logging out and logging back in to refresh tokens
 
 ### Files don't upload
 - Check CORS configuration on S3 bucket
 - Verify pre-signed URL hasn't expired (15 min limit)
 - Check browser console for errors
+- Ensure file name doesn't contain special characters
+
+### Storage statistics not updating
+- Statistics are updated in real-time by S3 event handler
+- Check CloudWatch Logs for S3 event handler Lambda
+- Verify S3 bucket has event notifications configured
+- Dashboard shows current values from DynamoDB
+
+### Cannot delete or modify root user
+- Root users are protected and can only be managed via CDK
+- This is intentional to prevent accidental lockout
+- Deploy infrastructure changes to modify root users
 
 ### SSH keys page shows wrong endpoint
 - Update `VITE_TRANSFER_ENDPOINT` in `.env.local`
 - Restart dev server after changing environment variables
+- Endpoint comes from CDK deployment outputs
+
+### Activity log not showing recent operations
+- Activity logs are stored in DynamoDB with 30-day retention
+- Check that operations are completing successfully
+- Verify DynamoDB activity table exists
+- Use filtering to search for specific users or actions
 
 ## License
 

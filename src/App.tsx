@@ -7,10 +7,13 @@ import FilesPage from './pages/Files';
 import SSHKeysPage from './pages/SSHKeys';
 import UsersPage from './pages/Users';
 import DashboardPage from './pages/Dashboard';
+import ProfilePage from './pages/Profile';
+import type { Notification } from './components/Notifications';
 
 function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     checkAuth();
@@ -27,23 +30,50 @@ function App() {
     }
   }
 
+  const handleLogin = (message?: string) => {
+    if (message) {
+      addNotification({
+        type: 'success',
+        header: 'Success',
+        message,
+      });
+    }
+    checkAuth();
+  };
+
+  const addNotification = (notification: Omit<Notification, 'id'>) => {
+    const id = `notification-${Date.now()}`;
+    setNotifications(prev => [...prev, { ...notification, id }]);
+  };
+
+  const dismissNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
 
   if (!user) {
-    return <LoginPage onLogin={checkAuth} />;
+    return <LoginPage onLogin={handleLogin} />;
   }
 
   const isAdmin = user.accessType === 'ADMIN';
+  const hasSSHAccess = user.accessType === 'SFTP_ONLY' || user.accessType === 'HYBRID';
 
   return (
     <BrowserRouter>
-      <AppShell user={user} onLogout={() => setUser(null)}>
+      <AppShell 
+        user={user} 
+        onLogout={() => setUser(null)}
+        notifications={notifications}
+        onDismissNotification={dismissNotification}
+      >
         <Routes>
           <Route path="/" element={<Navigate to="/files" replace />} />
           <Route path="/files" element={<FilesPage />} />
-          <Route path="/keys" element={<SSHKeysPage />} />
+          {hasSSHAccess && <Route path="/keys" element={<SSHKeysPage />} />}
+          <Route path="/profile" element={<ProfilePage user={user} />} />
           {isAdmin && <Route path="/users" element={<UsersPage />} />}
           {isAdmin && <Route path="/dashboard" element={<DashboardPage />} />}
           <Route path="*" element={<Navigate to="/files" replace />} />

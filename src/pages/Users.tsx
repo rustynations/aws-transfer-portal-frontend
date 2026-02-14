@@ -25,7 +25,6 @@ export default function UsersPage() {
   // Create user modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newUser, setNewUser] = useState({
-    username: '',
     email: '',
     access_type: 'WEB_ONLY' as UserData['access_type'],
     ssh_keys: '',
@@ -50,39 +49,90 @@ export default function UsersPage() {
   }
 
   async function handleCreateUser() {
-    if (!newUser.username || !newUser.email) return;
+    if (!newUser.email) return;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newUser.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    // Validate SSH keys for SFTP access types
+    const requiresSSH = newUser.access_type === 'SFTP_ONLY' || newUser.access_type === 'HYBRID';
+    const sshKeys = newUser.ssh_keys
+      .split('\n')
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+    
+    if (requiresSSH && sshKeys.length === 0) {
+      setError('SSH key is required for SFTP_ONLY and HYBRID users');
+      return;
+    }
 
     setCreating(true);
     setError('');
 
     try {
-      const sshKeys = newUser.ssh_keys
-        .split('\n')
-        .map(k => k.trim())
-        .filter(k => k.length > 0);
-
-      await createUser({
-        username: newUser.username,
+      const createdUser = await createUser({
         email: newUser.email,
         access_type: newUser.access_type,
         ssh_keys: sshKeys.length > 0 ? sshKeys : undefined,
         status: 'active',
       });
 
-      setSuccess(`User ${newUser.username} created successfully`);
+      // Show username in success message, especially important for SFTP users
+      if (newUser.access_type === 'SFTP_ONLY') {
+        setSuccess(`SFTP user created successfully. Username: ${createdUser.username}`);
+      } else if (newUser.access_type === 'HYBRID') {
+        setSuccess(`User created successfully. Username: ${createdUser.username}. Web login credentials sent via email.`);
+      } else {
+        setSuccess(`User created successfully. Login credentials sent to ${newUser.email}`);
+      }
+      
       setShowCreateModal(false);
       setNewUser({
-        username: '',
         email: '',
         access_type: 'WEB_ONLY',
         ssh_keys: '',
       });
       await loadUsers();
     } catch (err: any) {
-      setError(err.message || 'Failed to create user');
+      // Handle specific error cases with clear messages
+      if (err.statusCode === 409 || err.message?.includes('already exists')) {
+        setError(`A user with email ${newUser.email} already exists`);
+      } else if (err.message?.includes('Invalid')) {
+        setError(err.message);
+      } else {
+        setError(err.message || 'Failed to create user. Please try again.');
+      }
     } finally {
       setCreating(false);
     }
+  }
+
+  function getEmailValidationError(): string | undefined {
+    if (!newUser.email) return undefined;
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newUser.email)) {
+      return 'Invalid email format';
+    }
+    
+    return undefined;
+  }
+
+  function isCreateButtonDisabled(): boolean {
+    if (!newUser.email) return true;
+    if (getEmailValidationError()) return true;
+    
+    const requiresSSH = newUser.access_type === 'SFTP_ONLY' || newUser.access_type === 'HYBRID';
+    if (requiresSSH) {
+      const sshKeys = newUser.ssh_keys.split('\n').map(k => k.trim()).filter(k => k.length > 0);
+      return sshKeys.length === 0;
+    }
+    
+    return false;
   }
 
   async function handleDeleteUsers() {
@@ -150,23 +200,33 @@ export default function UsersPage() {
           </Alert>
         )}
 
+        {selectedItems.some(u => u.is_root) && (
+          <Alert type="info">
+            Root users cannot be modified or deleted through the web interface. They can only be managed via CDK deployment for security reasons.
+          </Alert>
+        )}
+
         <Table
           columnDefinitions={[
-            {
-              id: 'username',
-              header: 'Username',
-              cell: (item) => item.username,
-              sortingField: 'username',
-            },
             {
               id: 'email',
               header: 'Email',
               cell: (item) => item.email,
             },
             {
+              id: 'username',
+              header: 'SFTP User ID',
+              cell: (item) => item.username,
+              sortingField: 'username',
+            },
+            {
               id: 'access_type',
               header: 'Access Type',
-              cell: (item) => getAccessTypeBadge(item.access_type),
+              cell: (item) => item.is_root ? (
+                <Badge color="blue">ROOT</Badge>
+              ) : (
+                getAccessTypeBadge(item.access_type)
+              ),
             },
             {
               id: 'status',
@@ -199,6 +259,7 @@ export default function UsersPage() {
           selectionType="multi"
           selectedItems={selectedItems}
           onSelectionChange={({ detail }) => setSelectedItems(detail.selectedItems)}
+          isItemDisabled={(item) => item.is_root || false}
           empty={
             <Box textAlign="center" color="inherit">
               <b>No users</b>
@@ -213,7 +274,7 @@ export default function UsersPage() {
               actions={
                 <Button
                   iconName="remove"
-                  disabled={selectedItems.length === 0}
+                  disabled={selectedItems.length === 0 || selectedItems.some(u => u.is_root)}
                   onClick={handleDeleteUsers}
                 >
                   Delete
@@ -241,7 +302,7 @@ export default function UsersPage() {
                 variant="primary"
                 onClick={handleCreateUser}
                 loading={creating}
-                disabled={!newUser.username || !newUser.email}
+                disabled={isCreateButtonDisabled()}
               >
                 Create user
               </Button>
@@ -250,20 +311,17 @@ export default function UsersPage() {
         }
       >
         <SpaceBetween size="m">
-          <FormField label="Username" description="Unique identifier for the user">
-            <Input
-              value={newUser.username}
-              onChange={({ detail }) => setNewUser({ ...newUser, username: detail.value })}
-              placeholder="johndoe"
-            />
-          </FormField>
-
-          <FormField label="Email" description="User's email address">
+          <FormField 
+            label="Email" 
+            description="User's email address for web portal login"
+            errorText={getEmailValidationError()}
+          >
             <Input
               value={newUser.email}
               onChange={({ detail }) => setNewUser({ ...newUser, email: detail.value })}
               type="email"
               placeholder="john@example.com"
+              invalid={!!getEmailValidationError()}
             />
           </FormField>
 
@@ -277,25 +335,32 @@ export default function UsersPage() {
                 setNewUser({ ...newUser, access_type: detail.selectedOption.value as UserData['access_type'] })
               }
               options={[
-                { label: 'ADMIN', value: 'ADMIN', description: 'Full access to all features' },
+                { label: 'ADMIN', value: 'ADMIN', description: 'Full web portal access (no SFTP)' },
                 { label: 'WEB_ONLY', value: 'WEB_ONLY', description: 'Web portal access only' },
                 { label: 'SFTP_ONLY', value: 'SFTP_ONLY', description: 'SFTP access only (requires SSH key)' },
-                { label: 'HYBRID', value: 'HYBRID', description: 'Both web and SFTP access' },
+                { label: 'HYBRID', value: 'HYBRID', description: 'Both web and SFTP access (requires SSH key)' },
               ]}
             />
           </FormField>
 
-          <FormField
-            label="SSH Keys (optional)"
-            description="One SSH public key per line. Required for SFTP_ONLY users."
-          >
-            <Textarea
-              value={newUser.ssh_keys}
-              onChange={({ detail }) => setNewUser({ ...newUser, ssh_keys: detail.value })}
-              placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC..."
-              rows={4}
-            />
-          </FormField>
+          {(newUser.access_type === 'SFTP_ONLY' || newUser.access_type === 'HYBRID') && (
+            <FormField
+              label="SSH Keys"
+              description="One SSH public key per line. Required for SFTP access."
+              errorText={
+                newUser.access_type === 'SFTP_ONLY' || newUser.access_type === 'HYBRID'
+                  ? 'At least one SSH key is required'
+                  : undefined
+              }
+            >
+              <Textarea
+                value={newUser.ssh_keys}
+                onChange={({ detail }) => setNewUser({ ...newUser, ssh_keys: detail.value })}
+                placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC..."
+                rows={4}
+              />
+            </FormField>
+          )}
         </SpaceBetween>
       </Modal>
     </ContentLayout>

@@ -8,6 +8,10 @@ import Box from '@cloudscape-design/components/box';
 import Table from '@cloudscape-design/components/table';
 import Alert from '@cloudscape-design/components/alert';
 import Button from '@cloudscape-design/components/button';
+import TextFilter from '@cloudscape-design/components/text-filter';
+import Pagination from '@cloudscape-design/components/pagination';
+import CollectionPreferences from '@cloudscape-design/components/collection-preferences';
+import { useCollection } from '@cloudscape-design/collection-hooks';
 import { getSystemStats, getActivityLog, type SystemStats, type ActivityLogEntry } from '../utils/api';
 
 export default function DashboardPage() {
@@ -15,12 +19,38 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [preferences, setPreferences] = useState({
+    pageSize: 10,
+    visibleContent: ['timestamp', 'username', 'action', 'protocol', 'filename']
+  });
+
+  const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(
+    activity,
+    {
+      filtering: {
+        empty: (
+          <Box textAlign="center" color="inherit">
+            <b>No activities</b>
+          </Box>
+        ),
+        noMatch: (
+          <Box textAlign="center" color="inherit">
+            <b>No matches</b>
+            <Box padding={{ bottom: 's' }} variant="p" color="inherit">
+              We can't find a match.
+            </Box>
+            <Button onClick={() => actions.setFiltering('')}>Clear filter</Button>
+          </Box>
+        ),
+      },
+      pagination: { pageSize: preferences.pageSize },
+      sorting: {},
+    }
+  );
 
   useEffect(() => {
     loadData();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
+    // Removed auto-refresh - users can manually refresh with the button
   }, []);
 
   async function loadData() {
@@ -137,6 +167,7 @@ export default function DashboardPage() {
         </Container>
 
         <Table
+          {...collectionProps}
           columnDefinitions={[
             {
               id: 'timestamp',
@@ -147,7 +178,7 @@ export default function DashboardPage() {
             {
               id: 'username',
               header: 'User',
-              cell: (item) => item.username,
+              cell: (item) => item.email,
             },
             {
               id: 'action',
@@ -165,18 +196,54 @@ export default function DashboardPage() {
               cell: (item) => item.filename || '-',
             },
           ]}
-          items={activity}
+          items={items}
           loading={loading}
           loadingText="Loading activity"
-          empty={
-            <Box textAlign="center" color="inherit">
-              <b>No recent activity</b>
-            </Box>
+          visibleColumns={preferences.visibleContent}
+          filter={
+            <TextFilter
+              {...filterProps}
+              filteringPlaceholder="Find activities"
+              countText={`${filteredItemsCount} ${filteredItemsCount === 1 ? 'match' : 'matches'}`}
+            />
+          }
+          pagination={<Pagination {...paginationProps} />}
+          preferences={
+            <CollectionPreferences
+              title="Preferences"
+              confirmLabel="Confirm"
+              cancelLabel="Cancel"
+              preferences={preferences}
+              onConfirm={({ detail }) => setPreferences(detail as any)}
+              pageSizePreference={{
+                title: 'Page size',
+                options: [
+                  { value: 10, label: '10 activities' },
+                  { value: 20, label: '20 activities' },
+                  { value: 50, label: '50 activities' },
+                ],
+              }}
+              visibleContentPreference={{
+                title: 'Select visible columns',
+                options: [
+                  {
+                    label: 'Activity properties',
+                    options: [
+                      { id: 'timestamp', label: 'Time', editable: false },
+                      { id: 'username', label: 'User' },
+                      { id: 'action', label: 'Action' },
+                      { id: 'protocol', label: 'Protocol' },
+                      { id: 'filename', label: 'File' },
+                    ],
+                  },
+                ],
+              }}
+            />
           }
           header={
             <Header
               variant="h2"
-              description="Last 50 file operations"
+              counter={`(${activity.length})`}
             >
               Recent Activity
             </Header>

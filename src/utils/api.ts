@@ -57,6 +57,7 @@ export interface UserData {
   access_type: 'ADMIN' | 'WEB_ONLY' | 'SFTP_ONLY' | 'HYBRID';
   ssh_keys?: string[];
   status?: 'active' | 'disabled';
+  is_root?: boolean;
   created_at?: string;
   last_login?: string;
   file_count?: number;
@@ -184,6 +185,7 @@ export interface UserStats {
 export interface ActivityLogEntry {
   timestamp: string;
   username: string;
+  email: string;
   action: string;
   protocol: string;
   filename?: string;
@@ -198,5 +200,6 @@ export async function getUserStats(username: string): Promise<UserStats> {
 }
 
 export async function getActivityLog(): Promise<ActivityLogEntry[]> {
-  return apiRequest<ActivityLogEntry[]>('/admin/activity');
+  const response = await apiRequest<{ activities: ActivityLogEntry[]; count: number; timeRange: string }>('/admin/activity');
+  return response.activities;
 }
