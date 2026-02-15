@@ -4,11 +4,13 @@ React-based web portal for managing file transfers via AWS Transfer Family. Buil
 
 ## Features
 
-- **Secure Authentication**: Cognito-based login with email/password
-- **File Management**: Upload with progress bar, download, and delete files with pre-signed URLs
+- **Secure Authentication**: Cognito-based login with email/password and optional TOTP MFA
+- **File Management**: Upload with progress bar, download, delete, folder creation and navigation
+- **Folder Navigation**: Hierarchical folders with breadcrumb trail, create/delete folders
 - **SSH Key Management**: Add and manage SSH public keys for SFTP access
 - **Admin Dashboard**: System statistics, activity monitoring with filtering and pagination (admin only)
-- **User Management**: Create and manage user accounts with root user protection (admin only)
+- **User Management**: Create and manage user accounts with root user protection and MFA reset (admin only)
+- **Profile Management**: Display name editing, theme preference, password change, MFA enrollment
 - **Responsive Design**: Works on desktop and mobile devices using Cloudscape Design System
 - **Real-Time Updates**: Dashboard shows current file counts and storage usage
 - **Activity Logging**: All operations logged with username, action, and timestamp
@@ -58,17 +60,30 @@ The production build will be in the `dist/` directory, ready to deploy to S3 + C
 ```
 src/
 ├── components/
-│   └── layout/
-│       └── AppShell.tsx       # Main layout with navigation
+│   ├── layout/
+│   │   └── AppShell.tsx       # Main layout with navigation
+│   ├── BreadcrumbTrail.tsx    # Folder breadcrumb navigation
+│   ├── CreateFolderModal.tsx  # Folder creation with validation
+│   ├── FileListHeader.tsx     # File list action buttons
+│   ├── FileTable.tsx          # File/folder table with selection
+│   ├── Notifications.tsx      # Flash notifications
+│   └── TabNavigator.tsx       # My Files / Shared Files tabs
+├── hooks/
+│   └── useNotifications.ts    # Notification state management
 ├── pages/
-│   ├── Login.tsx              # Login page
-│   ├── Files.tsx              # File management
+│   ├── Login.tsx              # Login with MFA challenge support
+│   ├── Files.tsx              # File management with folder navigation
+│   ├── Profile.tsx            # Profile, theme, password, MFA settings
 │   ├── SSHKeys.tsx            # SSH key management
-│   ├── Users.tsx              # User management (admin)
+│   ├── Users.tsx              # User management with MFA reset (admin)
 │   └── Dashboard.tsx          # Admin dashboard
 ├── utils/
-│   ├── auth.ts                # Cognito authentication
-│   └── api.ts                 # API client
+│   ├── auth.ts                # Cognito authentication with MFA
+│   ├── api.ts                 # API client
+│   ├── totp-validation.ts     # TOTP code validation utilities
+│   ├── pathUtils.ts           # Folder path manipulation
+│   ├── permissions.ts         # Access control helpers
+│   └── theme.ts               # Theme preference management
 ├── config.ts                  # Configuration
 ├── App.tsx                    # Main app component
 └── main.tsx                   # Entry point
@@ -106,9 +121,11 @@ src/
 - **React 19**: UI framework
 - **TypeScript**: Type safety
 - **Vite**: Build tool and dev server
+- **Vitest**: Unit and property-based testing
 - **Cloudscape Design System**: AWS-style UI components
 - **React Router**: Client-side routing
-- **amazon-cognito-identity-js**: Cognito authentication
+- **amazon-cognito-identity-js**: Cognito authentication with MFA
+- **qrcode.react**: QR code generation for TOTP enrollment
 
 ## Development
 

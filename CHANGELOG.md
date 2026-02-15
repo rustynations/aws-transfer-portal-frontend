@@ -5,6 +5,43 @@ All notable changes to the AWS Transfer Portal web application will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-15
+
+### Added
+- TOTP MFA support: enable/disable MFA from Profile page with QR code enrollment
+- MFA login challenge flow with TOTP code entry
+- Admin MFA reset for users (Users management page)
+- Folder creation and deletion with validation
+- Hierarchical folder navigation with breadcrumb trail
+- Path-aware file upload, download, and delete (works within subfolders)
+- Tab navigation between My Files and Shared Files
+- File list header with contextual action buttons
+- Create folder modal with real-time inline validation
+- Theme preference (light/dark/system) on Profile page
+- Display name editing on Profile page
+- Loading spinner (centered, styled) during app initialization
+- Auto-focus on first input field across all login screens and create folder modal
+- Logout now navigates to Files view (resets URL)
+- TOTP validation utilities with comprehensive test coverage
+- Path utilities for safe folder navigation
+- Permission utilities for access control checks
+- Notification hook for consistent error/success messaging
+- Property-based tests for components and utilities
+- Vitest configuration for frontend testing
+
+### Changed
+- File table uses Cloudscape Link component for folder names (no hardcoded colors)
+- Folder click is single-click (not double-click)
+- Folder dates display dash when not available
+- Error responses now check both `error` and `message` fields from API
+- Profile loading state matches full layout structure (consistent ContentLayout header)
+
+### Fixed
+- MFA login callback uses `totpRequired` instead of `mfaRequired` (amazon-cognito-identity-js)
+- React key warning in Profile page caused by conditional Alert children inside SpaceBetween
+- File deletion within subfolders (path parameter was not being passed)
+- Upload within subfolders (path parameter was not being passed)
+
 ## [1.0.0] - 2026-02-13
 
 ### Added
@@ -22,8 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Responsive design for desktop and mobile
 - Secure token management with automatic refresh
 - Pre-signed URL generation for secure file operations
-- Activity logging for all operations
-- Support for multiple user access types (ADMIN, WEB_ONLY, HYBRID, SFTP_ONLY)
 
 ### Security
 - HTTPS-only API communication
@@ -34,24 +69,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CORS configuration
 - Secure session management
 
-### Technical
-- React 19 with TypeScript
-- Vite for build tooling
-- Cloudscape Design System components
-- React Router for navigation
-- amazon-cognito-identity-js for authentication
-- Node.js polyfills for browser compatibility
-
-## [Unreleased]
-
-### Planned
-- Multi-file upload support
-- File preview capabilities
-- Drag-and-drop file upload
-- User profile management
-- Email notifications for file operations
-- Advanced search and filtering
-- File sharing capabilities
-- Bulk operations (delete multiple files)
-- Export activity logs
-- Custom branding options
+[1.1.0]: https://github.com/rusty428/aws-transfer-portal-example/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/rusty428/aws-transfer-portal-example/releases/tag/v1.0.0

@@ -13,7 +13,7 @@ import Select from '@cloudscape-design/components/select';
 import Textarea from '@cloudscape-design/components/textarea';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Badge from '@cloudscape-design/components/badge';
-import { listUsers, createUser, deleteUser, type UserData } from '../utils/api';
+import { listUsers, createUser, deleteUser, resetUserMFA, type UserData } from '../utils/api';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserData[]>([]);
@@ -22,6 +22,10 @@ export default function UsersPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
+  // Reset MFA modal state
+  const [showResetMfaModal, setShowResetMfaModal] = useState(false);
+  const [resettingMfa, setResettingMfa] = useState(false);
+
   // Create user modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -122,15 +126,41 @@ export default function UsersPage() {
     return undefined;
   }
 
+  function validateSSHKey(key: string): string | undefined {
+    const trimmed = key.trim();
+    if (!trimmed) return undefined; // Empty is handled separately
+    
+    // Check for valid SSH key format (starts with key type)
+    const validPrefixes = ['ssh-rsa', 'ssh-ed25519', 'ecdsa-sha2-', 'ssh-dss'];
+    if (!validPrefixes.some(prefix => trimmed.startsWith(prefix))) {
+      return 'SSH key must start with a valid key type (ssh-rsa, ssh-ed25519, etc.)';
+    }
+    
+    // Basic structure check: should have at least 2 parts (type and key data)
+    const parts = trimmed.split(/\s+/);
+    if (parts.length < 2) {
+      return 'Invalid SSH key format';
+    }
+    
+    return undefined;
+  }
+
+  function getSSHKeyValidationError(): string | undefined {
+    const requiresSSH = newUser.access_type === 'SFTP_ONLY' || newUser.access_type === 'HYBRID';
+    if (!requiresSSH) return undefined;
+
+    const trimmed = newUser.ssh_keys.trim();
+    if (trimmed.length === 0) {
+      return 'At least one SSH key is required';
+    }
+
+    return validateSSHKey(trimmed);
+  }
+
   function isCreateButtonDisabled(): boolean {
     if (!newUser.email) return true;
     if (getEmailValidationError()) return true;
-    
-    const requiresSSH = newUser.access_type === 'SFTP_ONLY' || newUser.access_type === 'HYBRID';
-    if (requiresSSH) {
-      const sshKeys = newUser.ssh_keys.split('\n').map(k => k.trim()).filter(k => k.length > 0);
-      return sshKeys.length === 0;
-    }
+    if (getSSHKeyValidationError()) return true;
     
     return false;
   }
@@ -150,6 +180,26 @@ export default function UsersPage() {
       setError(err.message || 'Failed to delete users');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResetMfa() {
+    if (selectedItems.length !== 1) return;
+
+    const user = selectedItems[0];
+    setResettingMfa(true);
+    setError('');
+
+    try {
+      await resetUserMFA(user.username);
+      setSuccess(`MFA has been reset for ${user.email}. They will need to set up MFA again.`);
+      setShowResetMfaModal(false);
+      setSelectedItems([]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to reset MFA');
+      setShowResetMfaModal(false);
+    } finally {
+      setResettingMfa(false);
     }
   }
 
@@ -272,13 +322,21 @@ export default function UsersPage() {
             <Header
               counter={`(${users.length})`}
               actions={
-                <Button
-                  iconName="remove"
-                  disabled={selectedItems.length === 0 || selectedItems.some(u => u.is_root)}
-                  onClick={handleDeleteUsers}
-                >
-                  Delete
-                </Button>
+                <SpaceBetween direction="horizontal" size="xs">
+                  <Button
+                    disabled={selectedItems.length !== 1 || selectedItems.some(u => u.is_root)}
+                    onClick={() => setShowResetMfaModal(true)}
+                  >
+                    Reset MFA
+                  </Button>
+                  <Button
+                    iconName="remove"
+                    disabled={selectedItems.length === 0 || selectedItems.some(u => u.is_root)}
+                    onClick={handleDeleteUsers}
+                  >
+                    Delete
+                  </Button>
+                </SpaceBetween>
               }
             >
               Users
@@ -347,11 +405,7 @@ export default function UsersPage() {
             <FormField
               label="SSH Keys"
               description="One SSH public key per line. Required for SFTP access."
-              errorText={
-                newUser.access_type === 'SFTP_ONLY' || newUser.access_type === 'HYBRID'
-                  ? 'At least one SSH key is required'
-                  : undefined
-              }
+              errorText={getSSHKeyValidationError()}
             >
               <Textarea
                 value={newUser.ssh_keys}
@@ -362,6 +416,30 @@ export default function UsersPage() {
             </FormField>
           )}
         </SpaceBetween>
+      </Modal>
+
+      <Modal
+        visible={showResetMfaModal}
+        onDismiss={() => setShowResetMfaModal(false)}
+        header="Reset MFA"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button variant="link" onClick={() => setShowResetMfaModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleResetMfa}
+                loading={resettingMfa}
+              >
+                Reset MFA
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        Are you sure you want to reset MFA for {selectedItems.length === 1 ? selectedItems[0].email : ''}? They will need to set up MFA again.
       </Modal>
     </ContentLayout>
   );

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from '@cloudscape-design/components/app-layout';
 import SideNavigation, { type SideNavigationProps } from '@cloudscape-design/components/side-navigation';
@@ -20,6 +20,9 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
 
   const isAdmin = user.accessType === 'ADMIN';
   const hasSSHAccess = user.accessType === 'SFTP_ONLY' || user.accessType === 'HYBRID';
+  const isWebOnly = user.accessType === 'WEB_ONLY';
+
+  const [navigationOpen, setNavigationOpen] = useState(!isWebOnly);
 
   const navigationItems: SideNavigationProps.Item[] = [
     {
@@ -63,6 +66,7 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
 
   const handleLogout = async () => {
     logout();
+    navigate('/', { replace: true });
     onLogout();
   };
 
@@ -76,7 +80,7 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
         utilities={[
           {
             type: 'menu-dropdown',
-            text: user.email,
+            text: user.displayName || user.email,
             iconName: 'user-profile',
             items: [
               {
@@ -99,6 +103,8 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
         ]}
       />
       <AppLayout
+        navigationOpen={navigationOpen}
+        onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
         navigation={
           <SideNavigation
             header={{ text: 'Navigation', href: '/' }}

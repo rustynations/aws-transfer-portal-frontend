@@ -8,7 +8,8 @@ import Button from '@cloudscape-design/components/button';
 import Alert from '@cloudscape-design/components/alert';
 import Box from '@cloudscape-design/components/box';
 import Link from '@cloudscape-design/components/link';
-import { login, completeNewPassword, forgotPassword, confirmPasswordReset, type NewPasswordRequiredResult } from '../utils/auth';
+import { login, completeNewPassword, forgotPassword, confirmPasswordReset, confirmMFACode } from '../utils/auth';
+import { sanitizeTotpInput, isValidTotpCode } from '../utils/totp-validation';
 import { CognitoUser } from 'amazon-cognito-identity-js';
 
 interface LoginPageProps {
@@ -25,6 +26,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
+  const [mfaChallengeRequired, setMfaChallengeRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [resetCodeSent, setResetCodeSent] = useState(false);
   const [cognitoUser, setCognitoUser] = useState<CognitoUser | null>(null);
@@ -162,6 +165,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       if ('challengeName' in result && result.challengeName === 'NEW_PASSWORD_REQUIRED') {
         setPasswordChangeRequired(true);
         setCognitoUser(result.cognitoUser);
+      } else if ('challengeName' in result && result.challengeName === 'SOFTWARE_TOKEN_MFA') {
+        setMfaChallengeRequired(true);
+        setCognitoUser(result.cognitoUser);
       } else {
         onLogin();
       }
@@ -195,6 +201,93 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setLoading(false);
     }
   };
+
+  const handleMFASubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (!cognitoUser) {
+        throw new Error('No user session');
+      }
+      await confirmMFACode(cognitoUser, mfaCode);
+      onLogin();
+    } catch (err: any) {
+      setError(err.message || 'Invalid verification code. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  // MFA challenge flow
+  if (mfaChallengeRequired) {
+    return (
+      <Box padding={{ vertical: 'xxxl' }}>
+        <div style={{ maxWidth: '400px', margin: '0 auto' }}>
+          <form onSubmit={handleMFASubmit}>
+            <SpaceBetween size="l">
+              <Container
+                header={
+                  <Header variant="h1">
+                    Multi-Factor Authentication
+                  </Header>
+                }
+              >
+                <SpaceBetween size="m">
+                  <Alert type="info">
+                    Enter the 6-digit code from your authenticator app to complete sign in.
+                  </Alert>
+
+                  {error && (
+                    <Alert type="error" dismissible onDismiss={() => setError('')}>
+                      {error}
+                    </Alert>
+                  )}
+
+                  <FormField label="Authentication Code">
+                    <Input
+                      value={mfaCode}
+                      onChange={({ detail }) => setMfaCode(sanitizeTotpInput(detail.value))}
+                      placeholder="Enter 6-digit code"
+                      disabled={loading}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      autoFocus
+                    />
+                  </FormField>
+
+                  <Button
+                    variant="primary"
+                    formAction="submit"
+                    loading={loading}
+                    fullWidth
+                    disabled={!isValidTotpCode(mfaCode) || loading}
+                  >
+                    Verify
+                  </Button>
+
+                  <Box textAlign="center">
+                    <Link onFollow={() => {
+                      setMfaChallengeRequired(false);
+                      setMfaCode('');
+                      setError('');
+                      setCognitoUser(null);
+                    }}>
+                      Back to sign in
+                    </Link>
+                  </Box>
+                </SpaceBetween>
+              </Container>
+
+              <Box textAlign="center" color="text-body-secondary" fontSize="body-s">
+                Secure file transfer powered by AWS Transfer Family
+              </Box>
+            </SpaceBetween>
+          </form>
+        </div>
+      </Box>
+    );
+  }
 
   if (passwordChangeRequired) {
     return (
@@ -233,6 +326,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       disabled={loading}
                       autoComplete="new-password"
                       invalid={passwordErrors.length > 0}
+                      autoFocus
                     />
                   </FormField>
 
@@ -321,6 +415,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                           disabled={loading}
                           autoComplete="email"
                           invalid={!!emailError}
+                          autoFocus
                         />
                       </FormField>
 
@@ -366,6 +461,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                           onChange={({ detail }) => setResetCode(detail.value)}
                           placeholder="Enter code from email"
                           disabled={loading}
+                          autoFocus
                         />
                       </FormField>
 
@@ -474,6 +570,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     placeholder="user@example.com"
                     disabled={loading}
                     autoComplete="email"
+                    autoFocus
                   />
                 </FormField>
 

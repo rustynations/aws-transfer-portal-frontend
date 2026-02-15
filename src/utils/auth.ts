@@ -16,10 +16,16 @@ export interface User {
   username: string;
   email: string;
   accessType: string;
+  displayName?: string;
 }
 
 export interface NewPasswordRequiredResult {
   challengeName: 'NEW_PASSWORD_REQUIRED';
+  cognitoUser: CognitoUser;
+}
+
+export interface MFAChallengeResult {
+  challengeName: 'SOFTWARE_TOKEN_MFA';
   cognitoUser: CognitoUser;
 }
 
@@ -29,7 +35,7 @@ export interface NewPasswordRequiredResult {
 export async function login(
   email: string, 
   password: string
-): Promise<CognitoUserSession | NewPasswordRequiredResult> {
+): Promise<CognitoUserSession | NewPasswordRequiredResult | MFAChallengeResult> {
   const authenticationDetails = new AuthenticationDetails({
     Username: email,
     Password: password,
@@ -52,6 +58,12 @@ export async function login(
         // Return a special result indicating password change is required
         resolve({
           challengeName: 'NEW_PASSWORD_REQUIRED',
+          cognitoUser,
+        });
+      },
+      totpRequired: () => {
+        resolve({
+          challengeName: 'SOFTWARE_TOKEN_MFA',
           cognitoUser,
         });
       },
@@ -218,5 +230,149 @@ export async function confirmPasswordReset(
         reject(err);
       },
     });
+  });
+}
+
+/**
+ * Start MFA setup — returns the TOTP secret
+ */
+export async function associateSoftwareToken(): Promise<string> {
+  const cognitoUser = userPool.getCurrentUser();
+
+  if (!cognitoUser) {
+    throw new Error('No authenticated user');
+  }
+
+  return new Promise((resolve, reject) => {
+    cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      if (err || !session) {
+        reject(err || new Error('No session'));
+        return;
+      }
+
+      cognitoUser.associateSoftwareToken({
+        associateSecretCode: (secretCode: string) => {
+          resolve(secretCode);
+        },
+        onFailure: (err: Error) => {
+          reject(err);
+        },
+      });
+    });
+  });
+}
+
+/**
+ * Verify TOTP code during setup
+ */
+export async function verifySoftwareToken(totpCode: string): Promise<void> {
+  const cognitoUser = userPool.getCurrentUser();
+
+  if (!cognitoUser) {
+    throw new Error('No authenticated user');
+  }
+
+  return new Promise((resolve, reject) => {
+    cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      if (err || !session) {
+        reject(err || new Error('No session'));
+        return;
+      }
+
+      cognitoUser.verifySoftwareToken(totpCode, 'TOTP Device', {
+        onSuccess: () => {
+          resolve();
+        },
+        onFailure: (err: Error) => {
+          reject(err);
+        },
+      });
+    });
+  });
+}
+
+/**
+ * Set preferred MFA method
+ */
+export async function setPreferredMFA(method: 'TOTP' | 'NOMFA'): Promise<void> {
+  const cognitoUser = userPool.getCurrentUser();
+
+  if (!cognitoUser) {
+    throw new Error('No authenticated user');
+  }
+
+  return new Promise((resolve, reject) => {
+    cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      if (err || !session) {
+        reject(err || new Error('No session'));
+        return;
+      }
+
+      const smsMfaSettings = null;
+      const softwareTokenMfaSettings = {
+        PreferredMfa: method === 'TOTP',
+        Enabled: method === 'TOTP',
+      };
+
+      cognitoUser.setUserMfaPreference(smsMfaSettings, softwareTokenMfaSettings, (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    });
+  });
+}
+
+/**
+ * Get current MFA preference
+ */
+export async function getMFAPreference(): Promise<'TOTP' | 'NOMFA'> {
+  const cognitoUser = userPool.getCurrentUser();
+
+  if (!cognitoUser) {
+    throw new Error('No authenticated user');
+  }
+
+  return new Promise((resolve, reject) => {
+    cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      if (err || !session) {
+        reject(err || new Error('No session'));
+        return;
+      }
+
+      cognitoUser.getUserData((err, userData) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        if (userData?.PreferredMfaSetting === 'SOFTWARE_TOKEN_MFA') {
+          resolve('TOTP');
+        } else {
+          resolve('NOMFA');
+        }
+      });
+    });
+  });
+}
+
+/**
+ * Complete MFA challenge during login
+ */
+export async function confirmMFACode(
+  cognitoUser: CognitoUser,
+  code: string
+): Promise<CognitoUserSession> {
+  return new Promise((resolve, reject) => {
+    cognitoUser.sendMFACode(code, {
+      onSuccess: (session) => {
+        resolve(session);
+      },
+      onFailure: (err) => {
+        reject(err);
+      },
+    }, 'SOFTWARE_TOKEN_MFA');
   });
 }

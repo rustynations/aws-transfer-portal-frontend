@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getUser, type User } from './utils/auth';
+import { getThemePreference, listenForSystemThemeChanges } from './utils/theme';
 import LoginPage from './pages/Login';
 import AppShell from './components/layout/AppShell';
 import FilesPage from './pages/Files';
@@ -8,6 +9,8 @@ import SSHKeysPage from './pages/SSHKeys';
 import UsersPage from './pages/Users';
 import DashboardPage from './pages/Dashboard';
 import ProfilePage from './pages/Profile';
+import Spinner from '@cloudscape-design/components/spinner';
+import Box from '@cloudscape-design/components/box';
 import type { Notification } from './components/Notifications';
 
 function App() {
@@ -19,9 +22,24 @@ function App() {
     checkAuth();
   }, []);
 
+  // Listen for OS theme changes when preference is 'system'
+  useEffect(() => {
+    return listenForSystemThemeChanges(getThemePreference);
+  }, []);
+
   async function checkAuth() {
     try {
       const currentUser = await getUser();
+      if (currentUser) {
+        // Fetch display name from profile API
+        try {
+          const { getProfile } = await import('./utils/api');
+          const profile = await getProfile();
+          currentUser.displayName = profile.display_name || undefined;
+        } catch {
+          // Profile fetch failed — not critical, continue with email
+        }
+      }
       setUser(currentUser);
     } catch (error) {
       setUser(null);
@@ -51,7 +69,16 @@ function App() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Box textAlign="center">
+          <Spinner size="large" />
+          <Box variant="p" color="text-body-secondary" margin={{ top: 's' }}>
+            Loading...
+          </Box>
+        </Box>
+      </div>
+    );
   }
 
   if (!user) {
@@ -60,6 +87,10 @@ function App() {
 
   const isAdmin = user.accessType === 'ADMIN';
   const hasSSHAccess = user.accessType === 'SFTP_ONLY' || user.accessType === 'HYBRID';
+
+  const handleUserUpdate = (updates: Partial<User>) => {
+    setUser(prev => prev ? { ...prev, ...updates } : prev);
+  };
 
   return (
     <BrowserRouter>
@@ -73,7 +104,7 @@ function App() {
           <Route path="/" element={<Navigate to="/files" replace />} />
           <Route path="/files" element={<FilesPage />} />
           {hasSSHAccess && <Route path="/keys" element={<SSHKeysPage />} />}
-          <Route path="/profile" element={<ProfilePage user={user} />} />
+          <Route path="/profile" element={<ProfilePage user={user} onUserUpdate={handleUserUpdate} />} />
           {isAdmin && <Route path="/users" element={<UsersPage />} />}
           {isAdmin && <Route path="/dashboard" element={<DashboardPage />} />}
           <Route path="*" element={<Navigate to="/files" replace />} />

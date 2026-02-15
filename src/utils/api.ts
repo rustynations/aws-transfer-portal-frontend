@@ -15,7 +15,7 @@ async function apiRequest<T>(
 ): Promise<T> {
   const idToken = await getIdToken();
   
-  console.log('API Request:', endpoint);
+  // console.log('API Request:', endpoint);
   
   const response = await fetch(`${config.apiEndpoint}${endpoint}`, {
     ...options,
@@ -26,7 +26,7 @@ async function apiRequest<T>(
     },
   });
 
-  console.log('API Response status:', response.status, endpoint);
+  // console.log('API Response status:', response.status, endpoint);
 
   if (!response.ok) {
     const error: ApiError = {
@@ -37,7 +37,7 @@ async function apiRequest<T>(
     try {
       const errorData = await response.json();
       console.error('API Error response:', errorData);
-      error.message = errorData.message || error.message;
+      error.message = errorData.message || errorData.error || error.message;
     } catch {
       // Use default error message
     }
@@ -46,7 +46,7 @@ async function apiRequest<T>(
   }
 
   const data = await response.json();
-  console.log('API Response data:', endpoint, data);
+  // console.log('API Response data:', endpoint, data);
   return data;
 }
 
@@ -54,6 +54,7 @@ async function apiRequest<T>(
 export interface UserData {
   username: string;
   email: string;
+  display_name?: string;
   access_type: 'ADMIN' | 'WEB_ONLY' | 'SFTP_ONLY' | 'HYBRID';
   ssh_keys?: string[];
   status?: 'active' | 'disabled';
@@ -78,7 +79,7 @@ export async function getUser(username: string): Promise<UserData> {
   return apiRequest<UserData>(`/users/${username}`);
 }
 
-export async function createUser(user: Omit<UserData, 'created_at' | 'last_login' | 'file_count' | 'storage_bytes'>): Promise<UserData> {
+export async function createUser(user: Omit<UserData, 'username' | 'created_at' | 'last_login' | 'file_count' | 'storage_bytes'>): Promise<UserData> {
   return apiRequest<UserData>('/users', {
     method: 'POST',
     body: JSON.stringify(user),
@@ -95,6 +96,24 @@ export async function updateUser(username: string, updates: Partial<UserData>): 
 export async function deleteUser(username: string): Promise<void> {
   return apiRequest<void>(`/users/${username}`, {
     method: 'DELETE',
+  });
+}
+
+export async function resetUserMFA(userId: string): Promise<void> {
+  return apiRequest<void>(`/users/${userId}/reset-mfa`, {
+    method: 'POST',
+  });
+}
+
+// Profile API (self-service)
+export async function getProfile(): Promise<UserData> {
+  return apiRequest<UserData>('/users/profile');
+}
+
+export async function updateProfile(updates: { display_name: string }): Promise<{ message: string; display_name: string }> {
+  return apiRequest<{ message: string; display_name: string }>('/users/profile', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
   });
 }
 
@@ -130,41 +149,96 @@ export async function deleteKey(keyId: string): Promise<void> {
 }
 
 // File Operations API
+export type FolderType = 'private' | 'shared';
+
 export interface FileMetadata {
+  key: string;
   name: string;
   size: number;
   lastModified: string;
+  type: 'file';
+}
+
+export interface FolderMetadata {
+  name: string;
+  lastModified: string;
+  type: 'folder';
 }
 
 export interface FilesResponse {
   files: FileMetadata[];
+  folders: FolderMetadata[];
   count: number;
   totalSize: number;
 }
 
-export async function listFiles(): Promise<FileMetadata[]> {
-  const response = await apiRequest<FilesResponse>('/files');
-  return response.files;
+export async function listFiles(
+  folder: FolderType = 'private',
+  path?: string
+): Promise<FilesResponse> {
+  const params = new URLSearchParams({ folder });
+  if (path) {
+    params.append('path', path);
+  }
+  const data = await apiRequest<FilesResponse>(`/files?${params.toString()}`);
+  // Ensure type fields are set (backend may not include them)
+  data.files = (data.files || []).map(f => ({ ...f, type: 'file' as const }));
+  data.folders = (data.folders || []).map(f => ({ ...f, type: 'folder' as const }));
+  return data;
 }
 
-export async function getUploadUrl(filename: string): Promise<{ uploadUrl: string }> {
-  return apiRequest<{ uploadUrl: string }>('/files/upload-url', {
+export async function getUploadUrl(
+  filename: string,
+  folder: FolderType = 'private',
+  path?: string
+): Promise<{ uploadUrl: string; key: string }> {
+  return apiRequest<{ uploadUrl: string; key: string }>('/files/upload-url', {
     method: 'POST',
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({ filename, folder, path }),
   });
 }
 
-export async function getDownloadUrl(filename: string): Promise<{ downloadUrl: string }> {
+export async function getDownloadUrl(
+  filename: string,
+  folder: FolderType = 'private',
+  path?: string
+): Promise<{ downloadUrl: string }> {
   return apiRequest<{ downloadUrl: string }>('/files/download-url', {
     method: 'POST',
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({ filename, folder, path }),
   });
 }
 
-export async function deleteFile(filename: string): Promise<void> {
+export async function deleteFile(
+  filename: string,
+  folder: FolderType = 'private',
+  path?: string
+): Promise<void> {
   return apiRequest<void>('/files', {
     method: 'DELETE',
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({ filename, folder, path }),
+  });
+}
+
+export async function createFolder(
+  folderName: string,
+  folder: FolderType = 'private',
+  path?: string
+): Promise<void> {
+  return apiRequest<void>('/files/folder', {
+    method: 'POST',
+    body: JSON.stringify({ folderName, folder, path }),
+  });
+}
+
+export async function deleteFolder(
+  folderName: string,
+  folder: FolderType = 'private',
+  path?: string
+): Promise<void> {
+  return apiRequest<void>('/files/folder', {
+    method: 'DELETE',
+    body: JSON.stringify({ folderName, folder, path }),
   });
 }
 
