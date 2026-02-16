@@ -10,6 +10,7 @@ import Box from '@cloudscape-design/components/box';
 import Link from '@cloudscape-design/components/link';
 import { login, completeNewPassword, forgotPassword, confirmPasswordReset, confirmMFACode } from '../utils/auth';
 import { sanitizeTotpInput, isValidTotpCode } from '../utils/totp-validation';
+import { getPublicSettings } from '../config';
 import { CognitoUser } from 'amazon-cognito-identity-js';
 
 interface LoginPageProps {
@@ -33,6 +34,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [cognitoUser, setCognitoUser] = useState<CognitoUser | null>(null);
   const [lastResetRequestTime, setLastResetRequestTime] = useState<number>(0);
   const [resetCooldown, setResetCooldown] = useState<number>(0);
+
+  const publicSettings = getPublicSettings();
+  const appTitle = publicSettings?.appName || 'AWS Transfer Portal';
+  const loginDescription = publicSettings?.loginDescription || 'Secure file transfer powered by AWS Transfer Family';
 
   // Email validation
   const isValidEmail = (email: string) => {
@@ -280,7 +285,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </Container>
 
               <Box textAlign="center" color="text-body-secondary" fontSize="body-s">
-                Secure file transfer powered by AWS Transfer Family
+                {loginDescription}
               </Box>
             </SpaceBetween>
           </form>
@@ -358,7 +363,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </Container>
 
               <Box textAlign="center" color="text-body-secondary" fontSize="body-s">
-                Secure file transfer powered by AWS Transfer Family
+                {loginDescription}
               </Box>
             </SpaceBetween>
           </form>
@@ -524,7 +529,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </Container>
 
               <Box textAlign="center" color="text-body-secondary" fontSize="body-s">
-                Secure file transfer powered by AWS Transfer Family
+                {loginDescription}
               </Box>
             </SpaceBetween>
           </form>
@@ -541,7 +546,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <Container
               header={
                 <Header variant="h1">
-                  AWS Transfer Portal
+                  {appTitle}
                 </Header>
               }
             >
@@ -603,7 +608,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </Container>
 
             <Box textAlign="center" color="text-body-secondary" fontSize="body-s">
-              Secure file transfer powered by AWS Transfer Family
+              {loginDescription}
             </Box>
           </SpaceBetween>
         </form>

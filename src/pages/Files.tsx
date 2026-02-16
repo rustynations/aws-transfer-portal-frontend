@@ -18,9 +18,11 @@ import {
   deleteFile,
   deleteFolder,
   createFolder,
+  getAdminSettings,
   type FileMetadata,
   type FolderMetadata,
-  type FolderType 
+  type FolderType,
+  type AppSettings
 } from '../utils/api';
 import { constructPathParam, appendToPath, truncatePath, sanitizePath } from '../utils/pathUtils';
 import { useNotifications, categorizeError } from '../hooks/useNotifications';
@@ -29,6 +31,14 @@ import BreadcrumbTrail from '../components/BreadcrumbTrail';
 import FileListHeader from '../components/FileListHeader';
 import FileTable from '../components/FileTable';
 import CreateFolderModal from '../components/CreateFolderModal';
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
 
 export default function FilesPage() {
   // Tab and navigation state
@@ -56,6 +66,9 @@ export default function FilesPage() {
   // Delete confirmation modal state
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
+  // Settings for limit enforcement
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+
   // Detect files that would overwrite existing ones
   const conflictingFiles = useMemo(() => {
     if (uploadFiles.length === 0) return [];
@@ -67,6 +80,11 @@ export default function FilesPage() {
   useEffect(() => {
     loadFiles();
   }, [activeTab, currentPath]);
+
+  // Load settings for limit enforcement
+  useEffect(() => {
+    getAdminSettings().then(setAppSettings).catch(() => {});
+  }, []);
 
   async function loadFiles() {
     try {
@@ -109,6 +127,28 @@ export default function FilesPage() {
 
   async function handleUpload() {
     if (uploadFiles.length === 0) return;
+
+    // Validate file sizes against settings limit
+    if (appSettings?.maxFileSize) {
+      const oversized = uploadFiles.filter(f => f.size > appSettings.maxFileSize);
+      if (oversized.length > 0) {
+        notifyError(`File(s) exceed the ${formatBytes(appSettings.maxFileSize)} size limit: ${oversized.map(f => f.name).join(', ')}`);
+        return;
+      }
+    }
+
+    // Validate file types against settings whitelist
+    if (appSettings?.acceptedFileTypes && appSettings.acceptedFileTypes.length > 0) {
+      const allowedExts = appSettings.acceptedFileTypes.map(ext => ext.toLowerCase());
+      const rejected = uploadFiles.filter(f => {
+        const ext = '.' + f.name.split('.').pop()?.toLowerCase();
+        return !allowedExts.includes(ext);
+      });
+      if (rejected.length > 0) {
+        notifyError(`File type not allowed: ${rejected.map(f => f.name).join(', ')}. Accepted types: ${allowedExts.join(', ')}`);
+        return;
+      }
+    }
 
     setUploading(true);
 

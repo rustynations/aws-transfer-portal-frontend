@@ -13,9 +13,12 @@ import Select from '@cloudscape-design/components/select';
 import Textarea from '@cloudscape-design/components/textarea';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Badge from '@cloudscape-design/components/badge';
-import { listUsers, createUser, deleteUser, resetUserMFA, type UserData } from '../utils/api';
+import Icon from '@cloudscape-design/components/icon';
+import { listUsers, createUser, deleteUser, resetUserMFA, getAdminSettings, type UserData } from '../utils/api';
+import { isSftpEnabled } from '../config';
 
 export default function UsersPage() {
+  const sftpEnabled = isSftpEnabled();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItems, setSelectedItems] = useState<UserData[]>([]);
@@ -28,6 +31,7 @@ export default function UsersPage() {
 
   // Create user modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [defaultAccessType, setDefaultAccessType] = useState<UserData['access_type']>('WEB_ONLY');
   const [newUser, setNewUser] = useState({
     email: '',
     access_type: 'WEB_ONLY' as UserData['access_type'],
@@ -37,6 +41,14 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadUsers();
+    // Load default access type from settings
+    getAdminSettings().then(s => {
+      const at = s.defaultAccessType as UserData['access_type'];
+      if (at) {
+        setDefaultAccessType(at);
+        setNewUser(prev => ({ ...prev, access_type: at }));
+      }
+    }).catch(() => {});
   }, []);
 
   async function loadUsers() {
@@ -97,7 +109,7 @@ export default function UsersPage() {
       setShowCreateModal(false);
       setNewUser({
         email: '',
-        access_type: 'WEB_ONLY',
+        access_type: defaultAccessType,
         ssh_keys: '',
       });
       await loadUsers();
@@ -218,6 +230,17 @@ export default function UsersPage() {
       WEB_ONLY: 'green',
       SFTP_ONLY: 'grey',
     };
+    const isSftpType = accessType === 'SFTP_ONLY' || accessType === 'HYBRID';
+    if (!sftpEnabled && isSftpType) {
+      return (
+        <SpaceBetween direction="horizontal" size="xxs">
+          <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>
+            <Badge color={colors[accessType] || 'grey'}>{accessType}</Badge>
+          </span>
+          <Icon name="status-warning" variant="warning" />
+        </SpaceBetween>
+      );
+    }
     return <Badge color={colors[accessType] || 'grey'}>{accessType}</Badge>;
   }
 
@@ -256,6 +279,12 @@ export default function UsersPage() {
           </Alert>
         )}
 
+        {!sftpEnabled && users.some(u => u.access_type === 'SFTP_ONLY' || u.access_type === 'HYBRID') && (
+          <Alert type="warning">
+            SFTP is currently disabled, but some users have SFTP-dependent access types (SFTP_ONLY or HYBRID). These users will not be able to use SFTP until it is re-enabled.
+          </Alert>
+        )}
+
         <Table
           columnDefinitions={[
             {
@@ -263,12 +292,12 @@ export default function UsersPage() {
               header: 'Email',
               cell: (item) => item.email,
             },
-            {
+            ...(sftpEnabled ? [{
               id: 'username',
               header: 'SFTP User ID',
-              cell: (item) => item.username,
+              cell: (item: UserData) => item.username,
               sortingField: 'username',
-            },
+            }] : []),
             {
               id: 'access_type',
               header: 'Access Type',
@@ -395,8 +424,10 @@ export default function UsersPage() {
               options={[
                 { label: 'ADMIN', value: 'ADMIN', description: 'Full web portal access (no SFTP)' },
                 { label: 'WEB_ONLY', value: 'WEB_ONLY', description: 'Web portal access only' },
-                { label: 'SFTP_ONLY', value: 'SFTP_ONLY', description: 'SFTP access only (requires SSH key)' },
-                { label: 'HYBRID', value: 'HYBRID', description: 'Both web and SFTP access (requires SSH key)' },
+                ...(sftpEnabled ? [
+                  { label: 'SFTP_ONLY', value: 'SFTP_ONLY', description: 'SFTP access only (requires SSH key)' },
+                  { label: 'HYBRID', value: 'HYBRID', description: 'Both web and SFTP access (requires SSH key)' },
+                ] : []),
               ]}
             />
           </FormField>

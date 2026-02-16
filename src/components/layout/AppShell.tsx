@@ -4,6 +4,7 @@ import AppLayout from '@cloudscape-design/components/app-layout';
 import SideNavigation, { type SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import TopNavigation from '@cloudscape-design/components/top-navigation';
 import { logout, type User } from '../../utils/auth';
+import { getPublicSettings, isSftpEnabled } from '../../config';
 import Notifications, { type Notification } from '../Notifications';
 
 interface AppShellProps {
@@ -24,6 +25,9 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
 
   const [navigationOpen, setNavigationOpen] = useState(!isWebOnly);
 
+  const publicSettings = getPublicSettings();
+  const appTitle = publicSettings?.appName || 'AWS Transfer Portal';
+
   const navigationItems: SideNavigationProps.Item[] = [
     {
       type: 'link',
@@ -32,8 +36,8 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
     },
   ];
 
-  // Only show SSH Keys for users with SFTP access
-  if (hasSSHAccess) {
+  // Only show SSH Keys for users with SFTP access when SFTP is enabled
+  if (isSftpEnabled() && hasSSHAccess) {
     navigationItems.push({
       type: 'link',
       text: 'SSH Keys',
@@ -53,6 +57,11 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
         type: 'link',
         text: 'User Management',
         href: '/users',
+      },
+      {
+        type: 'link',
+        text: 'Settings',
+        href: '/settings',
       }
     );
   }
@@ -75,7 +84,7 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
       <TopNavigation
         identity={{
           href: '/',
-          title: 'AWS Transfer Portal',
+          title: appTitle,
         }}
         utilities={[
           {

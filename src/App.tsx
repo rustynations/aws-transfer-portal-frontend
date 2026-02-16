@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getUser, type User } from './utils/auth';
 import { getThemePreference, listenForSystemThemeChanges } from './utils/theme';
+import { getPublicSettings, isSftpEnabled } from './config';
 import LoginPage from './pages/Login';
 import AppShell from './components/layout/AppShell';
 import FilesPage from './pages/Files';
@@ -9,6 +10,7 @@ import SSHKeysPage from './pages/SSHKeys';
 import UsersPage from './pages/Users';
 import DashboardPage from './pages/Dashboard';
 import ProfilePage from './pages/Profile';
+import SettingsPage from './pages/Settings';
 import Spinner from '@cloudscape-design/components/spinner';
 import Box from '@cloudscape-design/components/box';
 import type { Notification } from './components/Notifications';
@@ -25,6 +27,21 @@ function App() {
   // Listen for OS theme changes when preference is 'system'
   useEffect(() => {
     return listenForSystemThemeChanges(getThemePreference);
+  }, []);
+
+  // Apply favicon and page title from public settings
+  useEffect(() => {
+    const settings = getPublicSettings();
+    if (settings?.faviconUrl) {
+      const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement
+        || document.createElement('link');
+      link.rel = 'icon';
+      link.href = settings.faviconUrl;
+      document.head.appendChild(link);
+    }
+    if (settings?.appName) {
+      document.title = settings.appName;
+    }
   }, []);
 
   async function checkAuth() {
@@ -103,10 +120,11 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/files" replace />} />
           <Route path="/files" element={<FilesPage />} />
-          {hasSSHAccess && <Route path="/keys" element={<SSHKeysPage />} />}
+          {isSftpEnabled() && hasSSHAccess && <Route path="/keys" element={<SSHKeysPage />} />}
           <Route path="/profile" element={<ProfilePage user={user} onUserUpdate={handleUserUpdate} />} />
           {isAdmin && <Route path="/users" element={<UsersPage />} />}
           {isAdmin && <Route path="/dashboard" element={<DashboardPage />} />}
+          {isAdmin && <Route path="/settings" element={<SettingsPage />} />}
           <Route path="*" element={<Navigate to="/files" replace />} />
         </Routes>
       </AppShell>

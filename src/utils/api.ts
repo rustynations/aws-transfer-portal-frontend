@@ -277,3 +277,56 @@ export async function getActivityLog(): Promise<ActivityLogEntry[]> {
   const response = await apiRequest<{ activities: ActivityLogEntry[]; count: number; timeRange: string }>('/admin/activity');
   return response.activities;
 }
+
+// Settings API
+export interface PublicSettings {
+  appName: string;
+  loginDescription: string;
+  logoUrl: string;
+  faviconUrl: string;
+  motd: string;
+  userPoolId: string;
+  userPoolClientId: string;
+  region: string;
+  apiEndpoint: string;
+  sftpEnabled: boolean;
+}
+
+export interface AppSettings extends PublicSettings {
+  settingKey: string;
+  projectName: string;
+  logoKey: string;
+  faviconKey: string;
+  acceptedFileTypes: string[];
+  maxFileSize: number;
+  maxStoragePerUser: number;
+  maxFilesPerUser: number;
+  defaultAccessType: string;
+  transferServerEndpoint?: string;
+  transferServerId?: string;
+  filesBucket: string;
+  _readOnlyFields: string[];
+}
+
+/**
+ * Fetch public settings (no auth required).
+ * Used to bootstrap the app before login.
+ */
+export async function getPublicSettings(): Promise<PublicSettings> {
+  const response = await fetch(`${config.apiEndpoint}/settings`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch public settings');
+  }
+  return response.json();
+}
+
+export async function getAdminSettings(): Promise<AppSettings> {
+  return apiRequest<AppSettings>('/admin/settings');
+}
+
+export async function updateSettings(updates: Partial<AppSettings>): Promise<{ message: string; updated: string[]; rejectedReadOnly?: string[] }> {
+  return apiRequest<{ message: string; updated: string[]; rejectedReadOnly?: string[] }>('/admin/settings', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
