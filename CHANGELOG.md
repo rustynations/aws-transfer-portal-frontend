@@ -5,6 +5,25 @@ All notable changes to the AWS Transfer Portal web application will be documente
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-19
+
+### Added
+- API key management UI in Profile page for users to create, view, and revoke their own API keys
+- API key management in Users page for admins to manage API keys for any user
+- Create API key modal with optional label and expiration settings
+- One-time display of raw API key with copy-to-clipboard functionality
+- API key table showing key ID, label, creation date, expiration, and last used timestamp
+- Revoke API key confirmation modal with warning message
+- API client functions: `listApiKeys`, `createApiKey`, `revokeApiKey`
+
+### Changed
+- Folder navigation tests updated to use single-click instead of double-click events
+- API URL handling improved to consistently remove trailing slashes
+
+### Fixed
+- Added missing `getAdminSettings` mock in test files to prevent test failures
+- Auth test corrected to use `totpRequired` callback instead of `mfaRequired`
+
 ## [1.1.0] - 2026-02-15
 
 ### Added
@@ -69,5 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CORS configuration
 - Secure session management
 
+[1.2.0]: https://github.com/rusty428/aws-transfer-portal-example/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/rusty428/aws-transfer-portal-example/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/rusty428/aws-transfer-portal-example/releases/tag/v1.0.0
