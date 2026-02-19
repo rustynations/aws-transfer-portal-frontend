@@ -12,6 +12,7 @@ vi.mock('../utils/api', () => ({
   deleteFile: vi.fn().mockResolvedValue(undefined),
   deleteFolder: vi.fn().mockResolvedValue(undefined),
   createFolder: vi.fn().mockResolvedValue(undefined),
+  getAdminSettings: vi.fn().mockResolvedValue({}),
 }));
 vi.mock('../utils/auth', () => ({ getIdToken: vi.fn().mockResolvedValue('t') }));
 vi.mock('../config', () => ({

@@ -196,8 +196,8 @@ describe('setPreferredMFA', () => {
 describe('login - MFA challenge', () => {
   it('returns MFAChallengeResult when Cognito sends SOFTWARE_TOKEN_MFA challenge', async () => {
     mockAuthenticateUser.mockImplementation(
-      (_authDetails: object, callbacks: { mfaRequired: Function }) => {
-        callbacks.mfaRequired();
+      (_authDetails: object, callbacks: { totpRequired: Function }) => {
+        callbacks.totpRequired();
       }
     );
 

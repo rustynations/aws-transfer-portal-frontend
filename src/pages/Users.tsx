@@ -14,7 +14,11 @@ import Textarea from '@cloudscape-design/components/textarea';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Badge from '@cloudscape-design/components/badge';
 import Icon from '@cloudscape-design/components/icon';
-import { listUsers, createUser, deleteUser, resetUserMFA, getAdminSettings, type UserData } from '../utils/api';
+import {
+  listUsers, createUser, deleteUser, resetUserMFA, getAdminSettings,
+  listApiKeys, createApiKey, revokeApiKey,
+  type UserData, type ApiKeyMetadata,
+} from '../utils/api';
 import { isSftpEnabled } from '../config';
 
 export default function UsersPage() {
@@ -38,6 +42,21 @@ export default function UsersPage() {
     ssh_keys: '',
   });
   const [creating, setCreating] = useState(false);
+
+  // Manage API Keys modal state
+  const [showApiKeysModal, setShowApiKeysModal] = useState(false);
+  const [apiKeys, setApiKeys] = useState<ApiKeyMetadata[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState('');
+  const [showCreateKeyModal, setShowCreateKeyModal] = useState(false);
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [newKeyExpiry, setNewKeyExpiry] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [showRawKeyModal, setShowRawKeyModal] = useState(false);
+  const [rawKey, setRawKey] = useState('');
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [revokeKeyId, setRevokeKeyId] = useState<string | null>(null);
+  const [revokingKey, setRevokingKey] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -244,6 +263,94 @@ export default function UsersPage() {
     return <Badge color={colors[accessType] || 'grey'}>{accessType}</Badge>;
   }
 
+  function truncateKeyId(keyId: string): string {
+    return keyId.length > 8 ? `${keyId.substring(0, 8)}...` : keyId;
+  }
+
+  function formatDate(timestamp?: number): string {
+    if (!timestamp) return '—';
+    return new Date(timestamp).toLocaleDateString();
+  }
+
+  async function loadApiKeysForUser(username: string, showError = false) {
+    setApiKeysLoading(true);
+    setApiKeyError('');
+    try {
+      const keys = await listApiKeys(username);
+      setApiKeys(keys);
+    } catch (err: any) {
+      console.error('Failed to load API keys:', err);
+      if (showError) {
+        setApiKeyError(err.message || 'Failed to load API keys');
+      }
+    } finally {
+      setApiKeysLoading(false);
+    }
+  }
+
+  function handleOpenApiKeysModal() {
+    if (selectedItems.length !== 1) return;
+    setShowApiKeysModal(true);
+    loadApiKeysForUser(selectedItems[0].username);
+  }
+
+  function handleCloseApiKeysModal() {
+    setShowApiKeysModal(false);
+    setApiKeys([]);
+    setApiKeyError('');
+  }
+
+  async function handleCreateApiKeyForUser() {
+    if (selectedItems.length !== 1) return;
+    setApiKeyError('');
+    setCreatingKey(true);
+    try {
+      const options: { username: string; label?: string; expiresInDays?: number } = {
+        username: selectedItems[0].username,
+      };
+      if (newKeyLabel.trim()) options.label = newKeyLabel.trim();
+      if (newKeyExpiry && parseInt(newKeyExpiry) > 0) options.expiresInDays = parseInt(newKeyExpiry);
+      const result = await createApiKey(options);
+      setRawKey(result.rawKey);
+      setShowCreateKeyModal(false);
+      setShowRawKeyModal(true);
+      setNewKeyLabel('');
+      setNewKeyExpiry('');
+      await loadApiKeysForUser(selectedItems[0].username, true);
+    } catch (err: any) {
+      setApiKeyError(err.message || 'Failed to create API key');
+    } finally {
+      setCreatingKey(false);
+    }
+  }
+
+  async function handleRevokeApiKeyForUser() {
+    if (!revokeKeyId || selectedItems.length !== 1) return;
+    setRevokingKey(true);
+    setApiKeyError('');
+    try {
+      await revokeApiKey(revokeKeyId);
+      setRevokeKeyId(null);
+      await loadApiKeysForUser(selectedItems[0].username, true);
+    } catch (err: any) {
+      setApiKeyError(err.message || 'Failed to revoke API key');
+    } finally {
+      setRevokingKey(false);
+    }
+  }
+
+  function handleCopyKey() {
+    navigator.clipboard.writeText(rawKey);
+    setKeyCopied(true);
+    setTimeout(() => setKeyCopied(false), 2000);
+  }
+
+  function handleCloseRawKeyModal() {
+    setRawKey('');
+    setKeyCopied(false);
+    setShowRawKeyModal(false);
+  }
+
   return (
     <ContentLayout
       header={
@@ -352,6 +459,12 @@ export default function UsersPage() {
               counter={`(${users.length})`}
               actions={
                 <SpaceBetween direction="horizontal" size="xs">
+                  <Button
+                    disabled={selectedItems.length !== 1 || selectedItems.some(u => u.is_root)}
+                    onClick={handleOpenApiKeysModal}
+                  >
+                    Manage API Keys
+                  </Button>
                   <Button
                     disabled={selectedItems.length !== 1 || selectedItems.some(u => u.is_root)}
                     onClick={() => setShowResetMfaModal(true)}
@@ -471,6 +584,212 @@ export default function UsersPage() {
         }
       >
         Are you sure you want to reset MFA for {selectedItems.length === 1 ? selectedItems[0].email : ''}? They will need to set up MFA again.
+      </Modal>
+
+      {/* Manage API Keys Modal */}
+      <Modal
+        visible={showApiKeysModal}
+        onDismiss={handleCloseApiKeysModal}
+        header={`API Keys — ${selectedItems.length === 1 ? selectedItems[0].email : ''}`}
+        size="large"
+        footer={
+          <Box float="right">
+            <Button variant="link" onClick={handleCloseApiKeysModal}>
+              Close
+            </Button>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          {apiKeyError && (
+            <Alert type="error" dismissible onDismiss={() => setApiKeyError('')}>
+              {apiKeyError}
+            </Alert>
+          )}
+          <Table
+            loading={apiKeysLoading}
+            loadingText="Loading API keys"
+            items={apiKeys}
+            header={
+              <Header
+                actions={
+                  <Button onClick={() => setShowCreateKeyModal(true)}>
+                    Create API Key
+                  </Button>
+                }
+              >
+                API Keys
+              </Header>
+            }
+            empty={
+              <Box textAlign="center" padding="l">
+                <SpaceBetween size="s">
+                  <Box variant="p" color="text-body-secondary">No API keys</Box>
+                  <Button onClick={() => setShowCreateKeyModal(true)}>Create API Key</Button>
+                </SpaceBetween>
+              </Box>
+            }
+            columnDefinitions={[
+              {
+                id: 'keyId',
+                header: 'Key ID',
+                cell: (item) => <code>{truncateKeyId(item.keyId)}</code>,
+              },
+              {
+                id: 'label',
+                header: 'Label',
+                cell: (item) => item.label || '—',
+              },
+              {
+                id: 'createdAt',
+                header: 'Created',
+                cell: (item) => formatDate(item.createdAt),
+              },
+              {
+                id: 'expiresAt',
+                header: 'Expires',
+                cell: (item) => formatDate(item.expiresAt),
+              },
+              {
+                id: 'lastUsedAt',
+                header: 'Last Used',
+                cell: (item) => formatDate(item.lastUsedAt),
+              },
+              {
+                id: 'actions',
+                header: 'Actions',
+                cell: (item) => (
+                  <Button
+                    variant="inline-link"
+                    onClick={() => setRevokeKeyId(item.keyId)}
+                  >
+                    Revoke
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </SpaceBetween>
+      </Modal>
+
+      {/* Create API Key for User Modal */}
+      <Modal
+        visible={showCreateKeyModal}
+        onDismiss={() => {
+          setShowCreateKeyModal(false);
+          setNewKeyLabel('');
+          setNewKeyExpiry('');
+        }}
+        header="Create API Key"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button
+                variant="link"
+                onClick={() => {
+                  setShowCreateKeyModal(false);
+                  setNewKeyLabel('');
+                  setNewKeyExpiry('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleCreateApiKeyForUser}
+                loading={creatingKey}
+              >
+                Create
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          <FormField label="Label" description="Optional label to identify this key">
+            <Input
+              value={newKeyLabel}
+              onChange={({ detail }) => setNewKeyLabel(detail.value)}
+              placeholder="e.g., CI/CD pipeline"
+              disabled={creatingKey}
+            />
+          </FormField>
+          <FormField label="Expires in (days)" description="Optional. Leave empty for no expiration.">
+            <Input
+              type="number"
+              value={newKeyExpiry}
+              onChange={({ detail }) => setNewKeyExpiry(detail.value)}
+              placeholder="e.g., 90"
+              disabled={creatingKey}
+            />
+          </FormField>
+        </SpaceBetween>
+      </Modal>
+
+      {/* Raw Key Display Modal */}
+      <Modal
+        visible={showRawKeyModal}
+        onDismiss={handleCloseRawKeyModal}
+        header="API Key Created"
+        footer={
+          <Box float="right">
+            <Button variant="primary" onClick={handleCloseRawKeyModal}>
+              Done
+            </Button>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          <Alert type="warning">
+            Copy this API key now. You will not be able to see it again.
+          </Alert>
+          <FormField label="API Key">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Input value={rawKey} readOnly />
+              <Button
+                iconName={keyCopied ? 'status-positive' : 'copy'}
+                onClick={handleCopyKey}
+              >
+                {keyCopied ? 'Copied' : 'Copy'}
+              </Button>
+            </SpaceBetween>
+          </FormField>
+        </SpaceBetween>
+      </Modal>
+
+      {/* Revoke API Key Confirmation Modal */}
+      <Modal
+        visible={revokeKeyId !== null}
+        onDismiss={() => setRevokeKeyId(null)}
+        header="Revoke API Key"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button variant="link" onClick={() => setRevokeKeyId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleRevokeApiKeyForUser}
+                loading={revokingKey}
+              >
+                Revoke
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          <Box>
+            Are you sure you want to revoke this API key? This action cannot be undone and any
+            applications using this key will lose access immediately.
+          </Box>
+          {revokeKeyId && (
+            <Box variant="awsui-key-label">
+              Key ID: <code>{revokeKeyId}</code>
+            </Box>
+          )}
+        </SpaceBetween>
       </Modal>
     </ContentLayout>
   );

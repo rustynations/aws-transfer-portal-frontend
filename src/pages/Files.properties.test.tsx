@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, fireEvent, screen } from '@testing-library/react';
 import * as fc from 'fast-check';
 import FilesPage from './Files';
 import type { FolderType } from '../utils/api';
@@ -13,6 +13,7 @@ vi.mock('../utils/api', () => ({
   deleteFile: vi.fn().mockResolvedValue(undefined),
   createFolder: vi.fn().mockResolvedValue(undefined),
   deleteFolder: vi.fn().mockResolvedValue(undefined),
+  getAdminSettings: vi.fn().mockResolvedValue({}),
 }));
 
 // Mock the auth module
@@ -245,10 +246,10 @@ describe('Folder Navigation Properties', () => {
             // but the navigation path construction is tab-independent
           }
 
-          // Double-click the folder to navigate into it
-          const folderNameEl = document.querySelector('[data-testid="folder-name"]');
+          // Click the folder link to navigate into it
+          const folderNameEl = screen.getByTestId('folder-name');
           expect(folderNameEl).toBeTruthy();
-          folderNameEl!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+          fireEvent.click(folderNameEl);
 
           // After navigation, the useEffect should trigger listFiles with the updated path
           await waitFor(() => {

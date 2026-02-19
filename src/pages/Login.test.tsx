@@ -25,6 +25,7 @@ vi.mock('../config', () => ({
       userPoolClientId: 'test-client-id',
     },
   },
+  getPublicSettings: () => null,
 }));
 
 vi.mock('amazon-cognito-identity-js', () => ({

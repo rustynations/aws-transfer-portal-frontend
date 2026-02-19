@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -12,6 +12,8 @@ import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
 import Spinner from '@cloudscape-design/components/spinner';
 import SegmentedControl from '@cloudscape-design/components/segmented-control';
+import Table from '@cloudscape-design/components/table';
+import Modal from '@cloudscape-design/components/modal';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   changePassword,
@@ -21,7 +23,15 @@ import {
   setPreferredMFA,
   type User,
 } from '../utils/auth';
-import { getProfile, updateProfile, type UserData } from '../utils/api';
+import {
+  getProfile,
+  updateProfile,
+  listApiKeys,
+  createApiKey,
+  revokeApiKey,
+  type UserData,
+  type ApiKeyMetadata,
+} from '../utils/api';
 import { getThemePreference, setThemePreference, type ThemePreference } from '../utils/theme';
 import { isValidTotpCode, sanitizeTotpInput, buildOtpAuthUri } from '../utils/totp-validation';
 
@@ -53,9 +63,24 @@ export default function ProfilePage({ user, onUserUpdate }: ProfilePageProps) {
   const [mfaError, setMfaError] = useState('');
   const [disableConfirm, setDisableConfirm] = useState(false);
 
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<ApiKeyMetadata[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(true);
+  const [showCreateKeyModal, setShowCreateKeyModal] = useState(false);
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [newKeyExpiry, setNewKeyExpiry] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [showRawKeyModal, setShowRawKeyModal] = useState(false);
+  const [rawKey, setRawKey] = useState('');
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [revokeKeyId, setRevokeKeyId] = useState<string | null>(null);
+  const [revokingKey, setRevokingKey] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState('');
+
   useEffect(() => {
     loadUserDetails();
     loadMfaStatus();
+    loadApiKeys();
   }, []);
 
   async function loadUserDetails() {
@@ -211,6 +236,78 @@ export default function ProfilePage({ user, onUserUpdate }: ProfilePageProps) {
       SFTP_ONLY: 'grey',
     };
     return <Badge color={colors[accessType] || 'grey'}>{accessType}</Badge>;
+  }
+
+  const loadApiKeys = useCallback(async (showError = false) => {
+    try {
+      setApiKeysLoading(true);
+      const keys = await listApiKeys();
+      setApiKeys(keys);
+    } catch (err: any) {
+      console.error('Failed to load API keys:', err);
+      if (showError) {
+        setApiKeyError('Failed to load API keys');
+      }
+    } finally {
+      setApiKeysLoading(false);
+    }
+  }, []);
+
+  async function handleCreateApiKey() {
+    setApiKeyError('');
+    setCreatingKey(true);
+    try {
+      const options: { label?: string; expiresInDays?: number } = {};
+      if (newKeyLabel.trim()) options.label = newKeyLabel.trim();
+      if (newKeyExpiry && parseInt(newKeyExpiry) > 0) options.expiresInDays = parseInt(newKeyExpiry);
+      const result = await createApiKey(options);
+      setRawKey(result.rawKey);
+      setShowCreateKeyModal(false);
+      setShowRawKeyModal(true);
+      setNewKeyLabel('');
+      setNewKeyExpiry('');
+      await loadApiKeys(true);
+    } catch (err: any) {
+      setApiKeyError(err.message || 'Failed to create API key');
+    } finally {
+      setCreatingKey(false);
+    }
+  }
+
+  async function handleRevokeApiKey() {
+    if (!revokeKeyId) return;
+    setRevokingKey(true);
+    setApiKeyError('');
+    try {
+      await revokeApiKey(revokeKeyId);
+      setRevokeKeyId(null);
+      await loadApiKeys(true);
+    } catch (err: any) {
+      setApiKeyError(err.message || 'Failed to revoke API key');
+    } finally {
+      setRevokingKey(false);
+    }
+  }
+
+  function handleCopyKey() {
+    navigator.clipboard.writeText(rawKey);
+    setKeyCopied(true);
+    setTimeout(() => setKeyCopied(false), 2000);
+  }
+
+  function handleCloseRawKeyModal() {
+    setRawKey('');
+    setKeyCopied(false);
+    setShowRawKeyModal(false);
+  }
+
+  function truncateKeyId(keyId: string): string {
+    return keyId.length > 8 ? `${keyId.substring(0, 8)}...` : keyId;
+  }
+
+  function formatDate(timestamp?: number): string {
+    if (!timestamp) return '—';
+    return new Date(timestamp).toLocaleDateString();
   }
 
   return (
@@ -395,6 +492,81 @@ export default function ProfilePage({ user, onUserUpdate }: ProfilePageProps) {
           </SpaceBetween>
         </Container>
 
+        <Container
+          header={
+            <Header
+              variant="h2"
+              actions={
+                <Button onClick={() => setShowCreateKeyModal(true)}>
+                  Create API Key
+                </Button>
+              }
+            >
+              API Keys
+            </Header>
+          }
+        >
+          <SpaceBetween size="m">
+            {apiKeyError && (
+              <Alert type="error" dismissible onDismiss={() => setApiKeyError('')}>
+                {apiKeyError}
+              </Alert>
+            )}
+            <Table
+              loading={apiKeysLoading}
+              loadingText="Loading API keys"
+              items={apiKeys}
+              empty={
+                <Box textAlign="center" padding="l">
+                  <SpaceBetween size="s">
+                    <Box variant="p" color="text-body-secondary">No API keys</Box>
+                    <Button onClick={() => setShowCreateKeyModal(true)}>Create API Key</Button>
+                  </SpaceBetween>
+                </Box>
+              }
+              columnDefinitions={[
+                {
+                  id: 'keyId',
+                  header: 'Key ID',
+                  cell: (item) => <code>{truncateKeyId(item.keyId)}</code>,
+                },
+                {
+                  id: 'label',
+                  header: 'Label',
+                  cell: (item) => item.label || '—',
+                },
+                {
+                  id: 'createdAt',
+                  header: 'Created',
+                  cell: (item) => formatDate(item.createdAt),
+                },
+                {
+                  id: 'expiresAt',
+                  header: 'Expires',
+                  cell: (item) => formatDate(item.expiresAt),
+                },
+                {
+                  id: 'lastUsedAt',
+                  header: 'Last Used',
+                  cell: (item) => formatDate(item.lastUsedAt),
+                },
+                {
+                  id: 'actions',
+                  header: 'Actions',
+                  cell: (item) => (
+                    <Button
+                      variant="inline-link"
+                      onClick={() => setRevokeKeyId(item.keyId)}
+                    >
+                      Revoke
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          </SpaceBetween>
+        </Container>
+
         <Container header={<Header variant="h2">Change Password</Header>}>
           <SpaceBetween size="m">
             <Alert type="info">
@@ -443,6 +615,126 @@ export default function ProfilePage({ user, onUserUpdate }: ProfilePageProps) {
         </Container>
       </SpaceBetween>
       )}
+
+      {/* Create API Key Modal */}
+      <Modal
+        visible={showCreateKeyModal}
+        onDismiss={() => {
+          setShowCreateKeyModal(false);
+          setNewKeyLabel('');
+          setNewKeyExpiry('');
+        }}
+        header="Create API Key"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button
+                variant="link"
+                onClick={() => {
+                  setShowCreateKeyModal(false);
+                  setNewKeyLabel('');
+                  setNewKeyExpiry('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleCreateApiKey}
+                loading={creatingKey}
+              >
+                Create
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          <FormField label="Label" description="Optional label to identify this key">
+            <Input
+              value={newKeyLabel}
+              onChange={({ detail }) => setNewKeyLabel(detail.value)}
+              placeholder="e.g., CI/CD pipeline"
+              disabled={creatingKey}
+            />
+          </FormField>
+          <FormField label="Expires in (days)" description="Optional. Leave empty for no expiration.">
+            <Input
+              type="number"
+              value={newKeyExpiry}
+              onChange={({ detail }) => setNewKeyExpiry(detail.value)}
+              placeholder="e.g., 90"
+              disabled={creatingKey}
+            />
+          </FormField>
+        </SpaceBetween>
+      </Modal>
+
+      {/* Raw Key Display Modal */}
+      <Modal
+        visible={showRawKeyModal}
+        onDismiss={handleCloseRawKeyModal}
+        header="API Key Created"
+        footer={
+          <Box float="right">
+            <Button variant="primary" onClick={handleCloseRawKeyModal}>
+              Done
+            </Button>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          <Alert type="warning">
+            Copy your API key now. You will not be able to see it again.
+          </Alert>
+          <FormField label="API Key">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Input value={rawKey} readOnly />
+              <Button
+                iconName={keyCopied ? 'status-positive' : 'copy'}
+                onClick={handleCopyKey}
+              >
+                {keyCopied ? 'Copied' : 'Copy'}
+              </Button>
+            </SpaceBetween>
+          </FormField>
+        </SpaceBetween>
+      </Modal>
+
+      {/* Revoke Confirmation Modal */}
+      <Modal
+        visible={revokeKeyId !== null}
+        onDismiss={() => setRevokeKeyId(null)}
+        header="Revoke API Key"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button variant="link" onClick={() => setRevokeKeyId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleRevokeApiKey}
+                loading={revokingKey}
+              >
+                Revoke
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          <Box>
+            Are you sure you want to revoke this API key? This action cannot be undone and any
+            applications using this key will lose access immediately.
+          </Box>
+          {revokeKeyId && (
+            <Box variant="awsui-key-label">
+              Key ID: <code>{revokeKeyId}</code>
+            </Box>
+          )}
+        </SpaceBetween>
+      </Modal>
     </ContentLayout>
   );
 }

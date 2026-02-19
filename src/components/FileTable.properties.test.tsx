@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import * as fc from 'fast-check';
 import FileTable from './FileTable';
 import type { FileMetadata, FolderMetadata } from '../utils/api';
@@ -195,7 +195,7 @@ describe('FileTable - Property-Based Tests', () => {
   /**
    * Test that double-clicking a folder triggers navigation
    */
-  it('should trigger navigation when folder is double-clicked', () => {
+  it('should trigger navigation when folder link is clicked', () => {
     const folder: FolderMetadata = {
       name: 'TestFolder',
       lastModified: new Date().toISOString(),
@@ -215,12 +215,12 @@ describe('FileTable - Property-Based Tests', () => {
       />
     );
 
-    // Find the folder name and double-click it
+    // Find the folder name link and click it
     const folderName = screen.getByTestId('folder-name');
     expect(folderName).toBeTruthy();
     
-    // Simulate double-click using fireEvent
-    folderName.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    // Click the link to trigger navigation
+    fireEvent.click(folderName);
 
     expect(onFolderNavigate).toHaveBeenCalledWith('TestFolder');
   });

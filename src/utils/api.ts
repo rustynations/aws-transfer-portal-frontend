@@ -17,7 +17,9 @@ async function apiRequest<T>(
   
   // console.log('API Request:', endpoint);
   
-  const response = await fetch(`${config.apiEndpoint}${endpoint}`, {
+  const baseUrl = config.apiEndpoint.replace(/\/+$/, '');
+  console.log('API Request:', `${baseUrl}${endpoint}`, options.method || 'GET', options.body || '');
+  const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -26,7 +28,7 @@ async function apiRequest<T>(
     },
   });
 
-  // console.log('API Response status:', response.status, endpoint);
+  console.log('API Response status:', response.status, endpoint);
 
   if (!response.ok) {
     const error: ApiError = {
@@ -313,7 +315,7 @@ export interface AppSettings extends PublicSettings {
  * Used to bootstrap the app before login.
  */
 export async function getPublicSettings(): Promise<PublicSettings> {
-  const response = await fetch(`${config.apiEndpoint}/settings`);
+  const response = await fetch(`${config.apiEndpoint.replace(/\/+$/, '')}/settings`);
   if (!response.ok) {
     throw new Error('Failed to fetch public settings');
   }
@@ -328,5 +330,52 @@ export async function updateSettings(updates: Partial<AppSettings>): Promise<{ m
   return apiRequest<{ message: string; updated: string[]; rejectedReadOnly?: string[] }>('/admin/settings', {
     method: 'PUT',
     body: JSON.stringify(updates),
+  });
+}
+
+
+// API Key Management API
+export interface ApiKeyMetadata {
+  keyId: string;
+  label: string;
+  createdAt: number;
+  expiresAt?: number;
+  lastUsedAt?: number;
+  status: 'active' | 'revoked';
+}
+
+export interface CreateApiKeyResponse {
+  keyId: string;
+  rawKey: string;
+  label: string;
+  createdAt: number;
+  expiresAt?: number;
+}
+
+export interface ListApiKeysResponse {
+  keys: ApiKeyMetadata[];
+  count: number;
+}
+
+export async function listApiKeys(username?: string): Promise<ApiKeyMetadata[]> {
+  const params = username ? `?username=${encodeURIComponent(username)}` : '';
+  const response = await apiRequest<ListApiKeysResponse>(`/api-keys${params}`);
+  return response.keys;
+}
+
+export async function createApiKey(options?: {
+  username?: string;
+  label?: string;
+  expiresInDays?: number;
+}): Promise<CreateApiKeyResponse> {
+  return apiRequest<CreateApiKeyResponse>('/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  });
+}
+
+export async function revokeApiKey(keyId: string): Promise<void> {
+  return apiRequest<void>(`/api-keys/${keyId}`, {
+    method: 'DELETE',
   });
 }
