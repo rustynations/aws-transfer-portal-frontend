@@ -14,7 +14,7 @@ export default function BreadcrumbTrail({ activeTab, currentPath, onNavigate }: 
 
   return (
     <BreadcrumbGroup
-      items={breadcrumbs.map((crumb, index) => ({
+      items={breadcrumbs.map((crumb) => ({
         text: crumb.label,
         href: '#', // Prevent default navigation
       }))}

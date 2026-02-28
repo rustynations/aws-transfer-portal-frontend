@@ -6,10 +6,8 @@ const {
   mockAssociateSoftwareToken,
   mockVerifySoftwareToken,
   mockSetUserMfaPreference,
-  mockGetUserData,
   mockSendMFACode,
   mockAuthenticateUser,
-  mockSignOut,
   mockGetCurrentUser,
   mockCognitoUser,
 } = vi.hoisted(() => {

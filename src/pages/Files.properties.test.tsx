@@ -279,7 +279,7 @@ describe('Folder Navigation Properties', () => {
           fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_-]{2,15}$/),
           { minLength: 1, maxLength: 4 }
         ),
-        async (activeTab, folderSequence) => {
+        async (_activeTab, folderSequence) => {
           // Test the path construction logic directly:
           // navigating through a sequence of folders should produce
           // the correct path parameter at each step
@@ -415,7 +415,7 @@ describe('Upload Modal Properties', () => {
         fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_.-]{2,30}$/), // Filename
         fc.constantFrom<FolderType>('private', 'shared'),
         fc.array(fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_-]{2,15}$/), { maxLength: 3 }),
-        async (filename, activeTab, currentPath) => {
+        async (_filename, _activeTab, currentPath) => {
           const pathParam = constructPathParam(currentPath);
 
           // Verify path construction logic
@@ -483,7 +483,6 @@ describe('Upload Modal Properties', () => {
 
           // Verify that after successful upload, listFiles would be called
           // In the actual component, this happens after the upload completes
-          const initialCallCount = vi.mocked(listFiles).mock.calls.length;
           
           // Simulate successful upload by calling getUploadUrl
           await getUploadUrl(filename, activeTab, undefined);

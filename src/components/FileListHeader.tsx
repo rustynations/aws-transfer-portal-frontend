@@ -19,7 +19,6 @@ interface FileListHeaderProps {
 export default function FileListHeader({
   activeTab,
   sharedFolderPermissions,
-  itemCount,
   hasSelection,
   onRefresh,
   onCreateFolder,

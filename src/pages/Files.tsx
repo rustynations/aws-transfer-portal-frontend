@@ -51,7 +51,7 @@ export default function FilesPage() {
   const [folders, setFolders] = useState<FolderMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItems, setSelectedItems] = useState<(FileMetadata | FolderMetadata)[]>([]);
-  const { items: notificationItems, notifySuccess, notifyError, clearAll } = useNotifications();
+  const { items: notificationItems, notifySuccess, notifyError } = useNotifications();
   
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);

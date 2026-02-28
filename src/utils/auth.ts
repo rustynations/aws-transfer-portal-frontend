@@ -176,7 +176,7 @@ export async function changePassword(oldPassword: string, newPassword: string): 
         return;
       }
 
-      cognitoUser.changePassword(oldPassword, newPassword, (err, result) => {
+      cognitoUser.changePassword(oldPassword, newPassword, (err) => {
         if (err) {
           reject(err);
           return;
