@@ -4,8 +4,8 @@
 
 If you discover a security vulnerability in this Transfer Portal web application, please report it by:
 
-1. **Opening a GitHub Issue**: [Create an issue](https://github.com/rusty428/aws-transfer-portal-example/issues) with the "security" label
-2. **Email**: Contact the maintainer directly at rustynations@gmail.com
+1. **Opening a GitHub Issue**: [Create an issue](https://github.com/rusty428/aws-transfer-portal-frontend/issues) with the "security" label
+2. **Email**: Contact the maintainer directly at maintainer@example.com
 
 Please include:
 - Description of the vulnerability
@@ -23,7 +23,9 @@ Please include:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| 1.2.x   | :white_check_mark: |
+| 1.1.x   | :white_check_mark: |
+| 1.0.x   | :x:                |
 
 ## Security Best Practices
 
