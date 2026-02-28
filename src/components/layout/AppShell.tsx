@@ -2,10 +2,11 @@ import { useState, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from '@cloudscape-design/components/app-layout';
 import SideNavigation, { type SideNavigationProps } from '@cloudscape-design/components/side-navigation';
-import TopNavigation from '@cloudscape-design/components/top-navigation';
 import { logout, type User } from '../../utils/auth';
-import { getPublicSettings, isSftpEnabled } from '../../config';
+import { isSftpEnabled } from '../../config';
 import Notifications, { type Notification } from '../Notifications';
+import PrivateHeader from './PrivateHeader';
+import PrivateFooter from './PrivateFooter';
 
 interface AppShellProps {
   user: User;
@@ -24,9 +25,6 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
   const isWebOnly = user.accessType === 'WEB_ONLY';
 
   const [navigationOpen, setNavigationOpen] = useState(!isWebOnly);
-
-  const publicSettings = getPublicSettings();
-  const appTitle = publicSettings?.appName || 'AWS Transfer Portal';
 
   const navigationItems: SideNavigationProps.Item[] = [
     {
@@ -80,60 +78,38 @@ export default function AppShell({ user, onLogout, notifications, onDismissNotif
   };
 
   return (
-    <>
-      <TopNavigation
-        identity={{
-          href: '/',
-          title: appTitle,
-        }}
-        utilities={[
-          {
-            type: 'menu-dropdown',
-            text: user.displayName || user.email,
-            iconName: 'user-profile',
-            items: [
-              {
-                id: 'profile',
-                text: 'Profile',
-              },
-              {
-                id: 'logout',
-                text: 'Sign out',
-              },
-            ],
-            onItemClick: ({ detail }) => {
-              if (detail.id === 'logout') {
-                handleLogout();
-              } else if (detail.id === 'profile') {
-                navigate('/profile');
-              }
-            },
-          },
-        ]}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <PrivateHeader
+        user={user}
+        onLogout={handleLogout}
+        onNavigateProfile={() => navigate('/profile')}
       />
-      <AppLayout
-        navigationOpen={navigationOpen}
-        onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
-        navigation={
-          <SideNavigation
-            header={{ text: 'Navigation', href: '/' }}
-            activeHref={location.pathname}
-            onFollow={handleNavigate}
-            items={navigationItems}
-          />
-        }
-        content={
-          <>
-            <Notifications 
-              notifications={notifications}
-              onDismiss={onDismissNotification}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <AppLayout
+          navigationOpen={navigationOpen}
+          onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
+          navigation={
+            <SideNavigation
+              header={{ text: 'Navigation', href: '/' }}
+              activeHref={location.pathname}
+              onFollow={handleNavigate}
+              items={navigationItems}
             />
-            {children}
-          </>
-        }
-        toolsHide
-        navigationWidth={200}
-      />
-    </>
+          }
+          content={
+            <>
+              <Notifications
+                notifications={notifications}
+                onDismiss={onDismissNotification}
+              />
+              {children}
+            </>
+          }
+          toolsHide
+          navigationWidth={200}
+        />
+      </div>
+      <PrivateFooter />
+    </div>
   );
 }

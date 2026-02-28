@@ -4,6 +4,7 @@ import { getUser, type User } from './utils/auth';
 import { getThemePreference, listenForSystemThemeChanges } from './utils/theme';
 import { getPublicSettings, isSftpEnabled } from './config';
 import LoginPage from './pages/Login';
+import PublicLayout from './components/layout/PublicLayout';
 import AppShell from './components/layout/AppShell';
 import FilesPage from './pages/Files';
 import SSHKeysPage from './pages/SSHKeys';
@@ -99,7 +100,7 @@ function App() {
   }
 
   if (!user) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <PublicLayout><LoginPage onLogin={handleLogin} /></PublicLayout>;
   }
 
   const isAdmin = user.accessType === 'ADMIN';

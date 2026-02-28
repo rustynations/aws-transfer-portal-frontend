@@ -287,6 +287,8 @@ export interface PublicSettings {
   logoUrl: string;
   faviconUrl: string;
   motd: string;
+  footerText: string;
+  footerLink: string;
   userPoolId: string;
   userPoolClientId: string;
   region: string;

@@ -36,7 +36,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [resetCooldown, setResetCooldown] = useState<number>(0);
 
   const publicSettings = getPublicSettings();
-  const appTitle = publicSettings?.appName || 'AWS Transfer Portal';
   const loginDescription = publicSettings?.loginDescription || 'Secure file transfer powered by AWS Transfer Family';
 
   // Email validation
@@ -227,7 +226,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   // MFA challenge flow
   if (mfaChallengeRequired) {
     return (
-      <Box padding={{ vertical: 'xxxl' }}>
+      
+        <Box padding={{ vertical: 'xxxl' }}>
         <div style={{ maxWidth: '400px', margin: '0 auto' }}>
           <form onSubmit={handleMFASubmit}>
             <SpaceBetween size="l">
@@ -291,12 +291,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </form>
         </div>
       </Box>
+
     );
   }
 
   if (passwordChangeRequired) {
     return (
-      <Box padding={{ vertical: 'xxxl' }}>
+      
+        <Box padding={{ vertical: 'xxxl' }}>
         <div style={{ maxWidth: '400px', margin: '0 auto' }}>
           <form onSubmit={handlePasswordChange}>
             <SpaceBetween size="l">
@@ -369,13 +371,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </form>
         </div>
       </Box>
+
     );
   }
 
   // Forgot password flow
   if (forgotPasswordMode) {
     return (
-      <Box padding={{ vertical: 'xxxl' }}>
+      
+        <Box padding={{ vertical: 'xxxl' }}>
         <div style={{ maxWidth: '400px', margin: '0 auto' }}>
           <form onSubmit={resetCodeSent ? handleResetPassword : handleForgotPassword}>
             <SpaceBetween size="l">
@@ -535,21 +539,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </form>
         </div>
       </Box>
+
     );
   }
 
   return (
-    <Box padding={{ vertical: 'xxxl' }}>
+    
+      <Box padding={{ vertical: 'xxxl' }}>
       <div style={{ maxWidth: '400px', margin: '0 auto' }}>
         <form onSubmit={handleSubmit}>
           <SpaceBetween size="l">
-            <Container
-              header={
-                <Header variant="h1">
-                  {appTitle}
-                </Header>
-              }
-            >
+            <Container>
               <SpaceBetween size="m">
                 <Box variant="p" color="text-body-secondary">
                   Sign in to manage your file transfers
@@ -614,5 +614,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         </form>
       </div>
     </Box>
+
   );
 }
