@@ -17,24 +17,25 @@ export default function Footer() {
     <div style={{
       textAlign: 'center',
       padding: '12px 0',
-      borderTop: '1px solid var(--color-border-divider-default, #e9ebed)',
+     borderTop: '1px solid var(--color-border-control-default, #414d5c)',
+       backgroundColor: 'var(--color-background-home-header, #0f1b2a)',
+
     }}>
-      <Box color="text-body-secondary" fontSize="body-s">
+      <Box  fontSize="body-s">
+        <span style={{ color: '#ffffff' }}>
         {footerLink ? (
-          <>
-            Built with{' '}
-            <a
-              href={footerLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'inherit', textDecoration: 'underline' }}
-            >
-              {footerText}
-            </a>
-          </>
+          <a
+            href={footerLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'inherit', textDecoration: 'underline' }}
+          >
+            {footerText}
+          </a>
         ) : (
-          <>Built with {footerText}</>
+          <>{footerText}</>
         )}
+        </span>
       </Box>
     </div>
   );

@@ -289,6 +289,7 @@ export interface PublicSettings {
   motd: string;
   footerText: string;
   footerLink: string;
+  helpUrl: string;
   userPoolId: string;
   userPoolClientId: string;
   region: string;

@@ -48,6 +48,11 @@ export default function SettingsPage() {
   const [maxFilesPerUser, setMaxFilesPerUser] = useState('1000');
   const [defaultAccessType, setDefaultAccessType] = useState('WEB_ONLY');
 
+  // Footer & Help state
+  const [footerText, setFooterText] = useState('');
+  const [footerLink, setFooterLink] = useState('');
+  const [helpUrl, setHelpUrl] = useState('');
+
   // Logo/favicon upload state
   const [logoFile, setLogoFile] = useState<File[]>([]);
   const [faviconFile, setFaviconFile] = useState<File[]>([]);
@@ -68,8 +73,11 @@ export default function SettingsPage() {
     if (parseBytes(maxStoragePerUser.value, maxStoragePerUser.unit) !== (settings.maxStoragePerUser || 1073741824)) return true;
     const currentTypes = acceptedFileTypes.filter(t => t.key && t.key.trim()).map(t => t.key.trim());
     if (JSON.stringify(currentTypes) !== JSON.stringify(settings.acceptedFileTypes || [])) return true;
+    if (footerText !== (settings.footerText || '')) return true;
+    if (footerLink !== (settings.footerLink || '')) return true;
+    if (helpUrl !== (settings.helpUrl || '')) return true;
     return false;
-  }, [settings, appName, loginDescription, defaultAccessType, maxFilesPerUser, maxFileSize, maxStoragePerUser, acceptedFileTypes]);
+  }, [settings, appName, loginDescription, defaultAccessType, maxFilesPerUser, maxFileSize, maxStoragePerUser, acceptedFileTypes, footerText, footerLink, helpUrl]);
 
   async function loadSettings() {
     try {
@@ -81,6 +89,9 @@ export default function SettingsPage() {
       setAppName(data.appName || '');
       setLoginDescription(data.loginDescription || '');
       setDefaultAccessType(data.defaultAccessType || 'WEB_ONLY');
+      setFooterText(data.footerText || '');
+      setFooterLink(data.footerLink || '');
+      setHelpUrl(data.helpUrl || '');
       setMaxFilesPerUser(String(data.maxFilesPerUser || 1000));
 
       const fileSizeSplit = splitBytes(data.maxFileSize || 104857600);
@@ -128,12 +139,17 @@ export default function SettingsPage() {
       const oldAcceptedFileTypes = settings?.acceptedFileTypes || [];
       if (JSON.stringify(newAcceptedFileTypes) !== JSON.stringify(oldAcceptedFileTypes)) updates.acceptedFileTypes = newAcceptedFileTypes;
 
+      if (footerText !== (settings?.footerText || '')) updates.footerText = footerText;
+      if (footerLink !== (settings?.footerLink || '')) updates.footerLink = footerLink;
+      if (helpUrl !== (settings?.helpUrl || '')) updates.helpUrl = helpUrl;
+
       if (Object.keys(updates).length === 0) {
         setSuccess('No changes to save.');
         setSaving(false);
         return;
       }
 
+      console.log('[Settings] Sending updates:', JSON.stringify(updates, null, 2));
       await updateSettings(updates as Partial<AppSettings>);
       setSuccess('Settings saved successfully.');
 
@@ -315,6 +331,37 @@ export default function SettingsPage() {
                 </SpaceBetween>
               </FormField>
             </ColumnLayout>
+          </SpaceBetween>
+        </Container>
+
+        {/* Footer & Help Section */}
+        <Container header={<Header variant="h2">Footer &amp; Help</Header>}>
+          <SpaceBetween size="m">
+            <FormField label="Footer Text" description="Text displayed in the footer. Leave empty to hide the footer entirely.">
+              <Input
+                value={footerText}
+                onChange={({ detail }) => setFooterText(detail.value)}
+                placeholder="AWS Transfer Portal"
+              />
+            </FormField>
+
+            <FormField label="Footer Link" description="URL the footer text links to. Leave empty for plain text (no link).">
+              <Input
+                value={footerLink}
+                onChange={({ detail }) => setFooterLink(detail.value)}
+                placeholder="https://github.com/rusty428/aws-transfer-portal-frontend"
+                type="url"
+              />
+            </FormField>
+
+            <FormField label="Help Link URL" description="URL for the help icon in the navigation bar. Leave empty to hide the help icon.">
+              <Input
+                value={helpUrl}
+                onChange={({ detail }) => setHelpUrl(detail.value)}
+                placeholder="https://github.com/rusty428/aws-transfer-portal-frontend"
+                type="url"
+              />
+            </FormField>
           </SpaceBetween>
         </Container>
 
