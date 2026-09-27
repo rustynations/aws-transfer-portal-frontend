@@ -16,24 +16,24 @@
     "@cloudscape-design/components": "^3.0.1201",
     "@cloudscape-design/global-styles": "^1.0.50",
     "amazon-cognito-identity-js": "^6.3.16",
+    "buffer": "^6.0.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "buffer": "^6.0.3",
     "react-router-dom": "^7.13.0"
   },
   "overrides": {
     "eslint": {
-      "minimatch": "3.1.4"
+      "minimatch": ">=3.1.5"
     },
     "typescript-eslint": {
-      "minimatch": "9.0.7"
+      "minimatch": ">=9.0.7"
     },
-    "flatted": "3.4.2",
-    "rollup": "4.59.0",
-    "picomatch": "4.0.4",
-    "brace-expansion": "1.1.13",
-    "ajv": "6.14.0"
+    "flatted": ">=3.4.2",
+    "rollup": ">=4.59.0",
+    "picomatch": ">=4.0.4",
+    "brace-expansion": ">=1.1.18 <2",
+    "ajv": ">=6.14.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -44,7 +44,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
-    "@vitest/ui": "^3.2.4",
+    "@vitest/ui": "^4.1.11",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
@@ -54,6 +54,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.11"
   }
 }

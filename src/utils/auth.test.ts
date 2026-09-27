@@ -46,12 +46,19 @@ const {
   };
 });
 
+// These three are called with `new`, so their mock implementations must be
+// `function` expressions. vitest 4 refuses to construct an arrow-function mock.
+// A constructor returning an object yields that object, so behaviour is unchanged.
 vi.mock('amazon-cognito-identity-js', () => ({
-  CognitoUserPool: vi.fn().mockImplementation(() => ({
-    getCurrentUser: mockGetCurrentUser,
-  })),
-  CognitoUser: vi.fn().mockImplementation(() => mockCognitoUser),
-  AuthenticationDetails: vi.fn().mockImplementation((data: Record<string, string>) => data),
+  CognitoUserPool: vi.fn().mockImplementation(function () {
+    return { getCurrentUser: mockGetCurrentUser };
+  }),
+  CognitoUser: vi.fn().mockImplementation(function () {
+    return mockCognitoUser;
+  }),
+  AuthenticationDetails: vi.fn().mockImplementation(function (data: Record<string, string>) {
+    return data;
+  }),
 }));
 
 vi.mock('../config', () => ({
